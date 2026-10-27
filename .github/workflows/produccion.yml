@@ -1,0 +1,45 @@
+# Cada push a main arma la web para la raíz (npm run build) y sube out/ por FTP a public_html/launion/.
+# Sube solo lo que cambió desde la vez anterior y borra lo que ya no está (los _next/ viejos): lo anota en el
+# servidor, en .ftp-deploy-sync-state.json. Lo que no subió él (api/, assets/, data/…) no lo toca.
+# Secretos (Settings → Secrets and variables → Actions): FTP_SERVIDOR, FTP_USUARIO y FTP_CLAVE.
+name: Subir a producción
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# De a una: si llega otro push mientras sube, espera. Cortar una subida a la mitad deja la web rota.
+concurrency:
+  group: produccion
+  cancel-in-progress: false
+
+jobs:
+  subir:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Revisa los tipos y deja todo en out/. No lleva variables: la API y las fotos están en la misma web.
+      - run: npm run build
+
+      - name: Subir out/ por FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVIDOR }}
+          username: ${{ secrets.FTP_USUARIO }}
+          password: ${{ secrets.FTP_CLAVE }}
+          protocol: ftps
+          port: 21
+          security: loose # DonWeb usa certificados autofirmados en FTP
+          local-dir: ./out/
+          server-dir: /public_html/launion/

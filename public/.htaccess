@@ -1,0 +1,27 @@
+# Apache (Ferozo): el .htaccess de public_html/launion/. Next lo copia a out/ en cada build y se sube con el resto.
+# Reglas relativas: funcionan en la raíz de launionmuebles.com.ar y en /dev sin cambios. api/ tiene el suyo.
+RewriteEngine On
+
+# Una sola dirección: https://launionmuebles.com.ar (sin www). La sesión del panel queda guardada por dirección;
+# con www o http sería otra. Solo actúa en este dominio.
+RewriteCond %{HTTP_HOST} ^www\.launionmuebles\.com\.ar$ [NC]
+RewriteRule ^ https://launionmuebles.com.ar%{REQUEST_URI} [R=301,L]
+# Ferozo tiene un proxy adelante: el https puede llegar como X-Forwarded-Proto y no como HTTPS=on.
+RewriteCond %{HTTP_HOST} ^launionmuebles\.com\.ar$ [NC]
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^ https://launionmuebles.com.ar%{REQUEST_URI} [R=301,L]
+
+# Precios del local de la web anterior (/administracion): no se abren desde la web.
+RewriteRule ^data/privado(/|$) - [F]
+
+# Archivos que no son parte de la web: copias .zip, notas y config de Vercel/local.
+RewriteRule (\.(zip|md|ini)|^serve\.json|^vercel\.json)$ - [F,NC]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^seguimiento/. seguimiento/index.html [L]
+
+# Link de vendedor (/pilar, /juan…): abre la web, que pone su WhatsApp en todos los botones. Se cargan en el panel → Vendedores.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^[a-z0-9-]+$ index.html [NC,L]

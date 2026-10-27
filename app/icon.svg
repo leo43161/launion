@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 460" role="img" aria-label="La Unión Muebles">
+  <defs>
+    <linearGradient id="lu-gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F2D58A"/>
+      <stop offset=".45" stop-color="#D6A548"/>
+      <stop offset="1" stop-color="#A9782C"/>
+    </linearGradient>
+    <linearGradient id="lu-bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C6B5D"/>
+      <stop offset="1" stop-color="#4A3E35"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(-14 -24)" stroke-linejoin="miter">
+    <!-- U -->
+    <path d="M100 66 L157 98 L157 334 L208 360 L262 333 L262 100 L318 64 L318 354 L208 412 L100 372 Z"
+          fill="url(#lu-bronze)" stroke="#231E1A" stroke-width="7"/>
+    <!-- L -->
+    <path d="M38 38 L80 56 L80 370 L194 424 L194 472 L38 396 Z"
+          fill="url(#lu-gold)" stroke="#231E1A" stroke-width="7"/>
+    <!-- drafting lines -->
+    <g stroke="#231E1A" stroke-width="2.2" fill="none" stroke-linecap="square">
+      <path d="M49 44 L49 418"/>
+      <path d="M20 360 L194 444"/>
+    </g>
+  </g>
+</svg>

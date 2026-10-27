@@ -1,0 +1,96 @@
+/* Web pública, con Tailwind. Los colores son variables: el tema (claro, gris u oscuro, en <html data-theme>) las cambia
+   todas de una vez, y @theme inline las convierte en clases (bg-surface, text-gold-ink, border-line…). */
+@import "tailwindcss";
+
+:root {
+  --bg: #FAF9F6; --surface: #FFFFFF; --surface-2: #F1EEE9; --ink: #1C1A17; --muted: #5C564F; --line: #E3DED7;
+  --bronze: #5B4C40; --gold: #B4862F; --gold-hi: #E8C778; --gold-deep: #8A6224; --gold-ink: #7A5A1E; --on-gold: #1C1A17;
+  --scrim: rgba(20, 16, 12, .58); --logo-line: #231E1A; --night: #1F1B17; --night-ink: #F4EFE7; --on-photo: #FBF7EF;
+  --shadow: 0 1px 2px rgba(28, 26, 23, .05), 0 6px 20px rgba(28, 26, 23, .06);
+  --f-display: "Marcellus", "Cormorant Garamond", "Times New Roman", serif;
+  --f-body: "Figtree", "Helvetica Neue", Arial, sans-serif;
+  --gutter: clamp(16px, 4.5vw, 40px); /* margen lateral de la página */
+  --hdr: 116px; /* alto del encabezado: para que los saltos a #secciones no queden tapados */
+  color-scheme: light;
+}
+@media (min-width: 960px) { :root { --hdr: 72px } }
+:root[data-theme="gris"] {
+  --bg: #D8D6D2; --surface: #ECEAE6; --surface-2: #CCC9C3; --ink: #1A1816; --muted: #47423D; --line: #BCB8B1;
+  --gold-ink: #664913; --night: #2B2825; --shadow: 0 1px 2px rgba(28, 26, 23, .08), 0 6px 20px rgba(28, 26, 23, .08);
+}
+:root[data-theme="oscuro"] {
+  --bg: #22201D; --surface: #2C2926; --surface-2: #38342F; --ink: #F3EFE9; --muted: #C2BAB0; --line: #47423C;
+  --bronze: #B8A698; --gold: #D2A650; --gold-hi: #F4DA93; --gold-deep: #A87A2E; --gold-ink: #E8C67C; --on-gold: #17130F;
+  --scrim: rgba(8, 6, 4, .62); --logo-line: #0E0C0B; --night: #161412; --shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 8px 24px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-bronze: var(--bronze);
+  --color-gold: var(--gold);
+  --color-gold-hi: var(--gold-hi);
+  --color-gold-deep: var(--gold-deep);
+  --color-gold-ink: var(--gold-ink);
+  --color-on-gold: var(--on-gold);
+  --color-scrim: var(--scrim);
+  --color-night: var(--night);
+  --color-night-ink: var(--night-ink);
+  --color-on-photo: var(--on-photo);
+  --font-display: var(--f-display);
+  --font-body: var(--f-body);
+  --shadow-suave: var(--shadow);
+}
+@theme {
+  /* Los cortes del diseño: celular, tablet (sm) y compu (lg) */
+  --breakpoint-*: initial;
+  --breakpoint-sm: 640px;
+  --breakpoint-lg: 960px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --default-transition-timing-function: ease;
+  --animate-sweep: sweep 7s ease-in-out infinite;
+  --animate-kb: kb 18s linear infinite;
+  --animate-drop: drop .6s cubic-bezier(.3, 1.25, .5, 1) both;
+}
+
+@keyframes shine { 0%, 35% { background-position: 100% 0 } 65%, 100% { background-position: 0 0 } }
+@keyframes sweep { 0%, 72% { transform: translateX(-120%) } 92%, 100% { transform: translateX(120%) } }
+@keyframes kb { 0% { opacity: 0; transform: scale(1.12) } 5% { opacity: 1 } 33% { opacity: 1 } 40% { opacity: 0; transform: scale(1) } 100% { opacity: 0 } }
+@keyframes drop { 0% { transform: translateY(calc(-100svh + 150px)) scale(.7); opacity: 0 } 60% { opacity: 1 } 100% { transform: none; opacity: 1 } }
+
+/* Brillo dorado que recorre algunas palabras */
+@utility shine {
+  background: linear-gradient(100deg, var(--gold-deep) 0%, var(--gold) 30%, var(--gold-hi) 46%, #FFF4D6 50%, var(--gold-hi) 54%, var(--gold) 70%, var(--gold-deep) 100%);
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 7s ease-in-out infinite;
+}
+/* Filas que se deslizan de costado, sin barra */
+@utility sin-barra {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none }
+}
+
+@layer base {
+  html { scroll-padding-top: calc(var(--hdr) + 12px) }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background .3s, color .3s;
+  }
+  h1, h2, h3, h4 { font-family: var(--f-display); font-weight: 400; letter-spacing: .005em; text-wrap: balance }
+  :focus-visible { outline: 2.5px solid var(--gold); outline-offset: 3px; border-radius: 8px }
+  .lu-sheen { mix-blend-mode: screen } /* el brillo que cruza el logo */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important }
+    .lu-sheen { display: none }
+  }
+}

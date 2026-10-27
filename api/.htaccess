@@ -1,0 +1,10 @@
+# Apache (Ferozo) pierde el encabezado Authorization en PHP-FPM: se lo pasa a PHP para que llegue el token.
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Solo se entra por index.php: config, librerías, herramientas, .user.ini y copias .zip no se abren desde la web.
+# (Las reglas del .htaccess de arriba no llegan acá: esta carpeta tiene su propio RewriteEngine.)
+RewriteRule ^(config|config\.example|lib)\.php$ - [F,NC]
+RewriteRule ^(rutas|herramientas)/ - [F,NC]
+RewriteRule \.(ini|zip)$ - [F,NC]
