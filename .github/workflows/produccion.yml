@@ -1,6 +1,4 @@
 # Cada push a main arma la web para la raíz (npm run build) y sube out/ por FTP a public_html/launion/.
-# Sube solo lo que cambió desde la vez anterior y borra lo que ya no está (los _next/ viejos): lo anota en el
-# servidor, en .ftp-deploy-sync-state.json. Lo que no subió él (api/, assets/, data/…) no lo toca.
 # Secretos (Settings → Secrets and variables → Actions): FTP_SERVIDOR, FTP_USUARIO y FTP_CLAVE.
 name: Subir a producción
 
@@ -32,14 +30,25 @@ jobs:
       # Revisa los tipos y deja todo en out/. No lleva variables: la API y las fotos están en la misma web.
       - run: npm run build
 
+      # Con lftp y no con FTP-Deploy-Action: contra Ferozo esa acción se cortaba en la primera conexión de datos
+      # (ECONNRESET) y abortaba todo; lftp reintenta. Primero sube todo out/ sin borrar nada (al lado están api/,
+      # assets/…) y después borra de _next/ lo que ya no está: los JS de las versiones anteriores.
       - name: Subir out/ por FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: ${{ secrets.FTP_SERVIDOR }}
-          username: ${{ secrets.FTP_USUARIO }}
-          password: ${{ secrets.FTP_CLAVE }}
-          protocol: ftps
-          port: 21
-          security: loose # DonWeb usa certificados autofirmados en FTP
-          local-dir: ./out/
-          server-dir: /public_html/launion/
+        env:
+          FTP_SERVIDOR: ${{ secrets.FTP_SERVIDOR }}
+          FTP_USUARIO: ${{ secrets.FTP_USUARIO }}
+          LFTP_PASSWORD: ${{ secrets.FTP_CLAVE }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+          lftp -c "
+          set cmd:fail-exit yes
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate no
+          set net:max-retries 3
+          set net:reconnect-interval-base 5
+          set net:timeout 30
+          open --env-password -u \"$FTP_USUARIO\" \"$FTP_SERVIDOR\"
+          mirror -R --no-perms --verbose out /public_html/launion
+          mirror -R --no-perms --verbose --delete --only-missing out/_next /public_html/launion/_next
+          "

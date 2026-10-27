@@ -33,7 +33,7 @@ La web está en `public_html/launion/`. El `.htaccess` de `public_html` manda `l
 ### Automático: cada push a main
 
 `.github/workflows/produccion.yml` corre `npm run build` y sube `out/` por FTP a `public_html/launion/`: es la web de la raíz.
-- Sube solo lo que cambió y borra los archivos viejos que subió él. No toca `api/`, `assets/` ni nada que no haya subido.
+- Sube con `lftp` todo `out/` (1,5 MB) y borra de `_next/` los JS de versiones anteriores. No borra nada más: `api/`, `assets/` y el resto quedan como están.
 - Necesita tres secretos en GitHub (Settings → Secrets and variables → Actions): `FTP_SERVIDOR`, `FTP_USUARIO` y `FTP_CLAVE`.
 - La API no se sube sola: si cambia algo en `api/`, se sube a mano.
 - Para volver a correrlo sin hacer push: Actions → Subir a producción → Run workflow.
