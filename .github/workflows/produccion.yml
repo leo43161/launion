@@ -49,6 +49,6 @@ jobs:
           set net:reconnect-interval-base 5
           set net:timeout 30
           open --env-password -u \"$FTP_USUARIO\" \"$FTP_SERVIDOR\"
-          mirror -R --no-perms --verbose out /public_html/launion
+          mirror -R --no-perms --overwrite --verbose out /public_html/launion
           mirror -R --no-perms --verbose --delete --only-missing out/_next /public_html/launion/_next
           "
