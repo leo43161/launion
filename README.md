@@ -9,7 +9,7 @@
   - ingreso;
   - **Catálogo**: alta, edición, fotos, video, precios, ocultar, eliminar y restaurar;
   - **Vendedores**;
-  - **Presupuestos**: reemplazan la planilla de Excel. Despiece, insumos, costo, precio, precio final y foto; cualquier usuario los ve y edita;
+  - **Presupuestos**: reemplazan la planilla de Excel. Despiece, insumos, costo, precio, precio final y foto; cualquier usuario los ve y edita. Cada uno se puede vincular a un modelo del catálogo, que muestra sus presupuestos;
   - **Usuarios**: solo el administrador. Alta, edición, contraseña temporal y eliminación. Cada uno cambia la suya desde "Cambiar mi contraseña".
 
 ## Probar en la compu
@@ -37,10 +37,11 @@ La web está en `public_html/launion/`. El `.htaccess` de `public_html` manda `l
 
 ### Automático: cada push a main
 
-`.github/workflows/produccion.yml` corre `npm run build` y sube `out/` por FTP a `public_html/launion/`: es la web de la raíz.
-- Sube con `lftp` todo `out/` (1,5 MB) y borra de `_next/` los JS de versiones anteriores. No borra nada más: `api/`, `assets/` y el resto quedan como están.
+`.github/workflows/produccion.yml` sube la API a `public_html/launion/api/`, corre `npm run build` y sube `out/` por FTP a `public_html/launion/`: es la web de la raíz.
+- Sube con `lftp`, primero `api/` (menos `herramientas/`) y después todo `out/` (1,5 MB). Borra de `_next/` los JS de versiones anteriores y nada más: `config.php`, `assets/` y el resto quedan como están.
 - Necesita tres secretos en GitHub (Settings → Secrets and variables → Actions): `FTP_SERVIDOR`, `FTP_USUARIO` y `FTP_CLAVE`.
-- La API no se sube sola: si cambia algo en `api/`, se sube a mano.
+- La base no se toca sola: si hay un `db/arreglo-*.sql` nuevo, importalo en phpMyAdmin **antes** del push. Si no, la API nueva busca columnas que todavía no existen.
+- `config.php` no está en el repo: se crea a mano una sola vez en el servidor (paso 2 de abajo).
 - Para volver a correrlo sin hacer push: Actions → Subir a producción → Run workflow.
 
 ### Primero: prueba en /dev

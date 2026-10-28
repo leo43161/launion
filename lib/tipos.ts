@@ -82,6 +82,7 @@ export interface Producto extends Medidas {
   fotos: string[];
   precio_web: Precio | null;
   precio_local: Monto | null;
+  presupuestos: { id: number; nombre: string; multiplicador: Monto; precio_final: Monto | null; costo: Monto }[]; // los vinculados a este modelo
 }
 
 /** Lo que recibe producto/guardar. Sin id = alta. Los textos vacíos se guardan como NULL. */
@@ -132,6 +133,8 @@ export interface PresupuestoFila {
   id: number;
   nombre: string;
   grupo: string | null;
+  producto_id: number | null; // modelo del catálogo vinculado
+  producto: string | null; // su nombre
   url_foto: string | null;
   multiplicador: Monto;
   precio_final: Monto | null; // null = el calculado
@@ -159,6 +162,7 @@ export interface Presupuesto {
   id: number;
   nombre: string;
   grupo: string | null;
+  producto_id: number | null;
   url_foto: string | null;
   notas: string | null;
   multiplicador: Monto;
@@ -176,6 +180,7 @@ export interface PresupuestoGuardar {
   id: number | null;
   nombre: string;
   grupo: string;
+  producto_id: number | null;
   url_foto: string;
   notas: string;
   multiplicador: number;

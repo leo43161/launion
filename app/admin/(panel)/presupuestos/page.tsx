@@ -33,7 +33,7 @@ export default function Presupuestos() {
     const q = norm(f.q.trim());
     return (lista ?? []).filter((p) =>
       (!f.grupo || p.grupo === f.grupo) &&
-      (!q || q.split(/\s+/).every((t) => norm(`${p.nombre} ${p.grupo || ""}`).includes(t))));
+      (!q || q.split(/\s+/).every((t) => norm(`${p.nombre} ${p.grupo || ""} ${p.producto || ""}`).includes(t))));
   }, [lista, f]);
 
   return (
@@ -47,7 +47,7 @@ export default function Presupuestos() {
       <div className="card card-pad" style={{ marginBottom: 14, padding: 12 }}>
         <div className="row">
           <label className="gsearch grow" style={{ width: "auto", minWidth: 220 }}><Icono n="search" /><span className="sr">Buscar presupuestos</span>
-            <input type="search" placeholder="Buscar por nombre o grupo" value={f.q} onChange={(e) => filtrar({ q: e.target.value })} />
+            <input type="search" placeholder="Buscar por nombre, grupo o modelo" value={f.q} onChange={(e) => filtrar({ q: e.target.value })} />
           </label>
           <select className="select" style={{ width: "auto" }} aria-label="Grupo" value={f.grupo} onChange={(e) => filtrar({ grupo: e.target.value })}>
             <option value="">Todos los grupos</option>
@@ -71,7 +71,7 @@ export default function Presupuestos() {
                   <td className="hide-m">{p.url_foto ? <img className="thumb" src={media(p.url_foto)} alt="" loading="lazy" /> : <span className="thumb" style={{ display: "grid", placeItems: "center", color: "var(--faint)" }}><Icono n="image" /></span>}</td>
                   <td className="full">
                     <Link className="cell-title" href={`/admin/presupuestos/editar/?id=${p.id}`} onClick={(e) => e.stopPropagation()} style={{ textDecoration: "none", color: "inherit" }}>{p.nombre}</Link>
-                    <span className="cell-sub">{p.grupo || "Sin grupo"}</span>
+                    <span className="cell-sub">{p.grupo || "Sin grupo"}{p.producto && ` · Modelo: ${p.producto}`}</span>
                   </td>
                   <td data-label="Costo" className="num">{ars(p.costo)}</td>
                   <td data-label={`Precio (× ${String(Number(p.multiplicador)).replace(".", ",")})`} className="num">{ars(precioPresupuesto(p.costo, p.multiplicador))}</td>

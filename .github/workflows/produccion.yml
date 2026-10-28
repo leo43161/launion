@@ -1,4 +1,5 @@
-# Cada push a main arma la web para la raíz (npm run build) y sube out/ por FTP a public_html/launion/.
+# Cada push a main sube la API (api/ → public_html/launion/api/), arma la web para la raíz (npm run build) y sube out/ por FTP a public_html/launion/.
+# La base no: los arreglo-*.sql se importan a mano en phpMyAdmin ANTES del push, o la API nueva busca columnas que todavía no existen.
 # Secretos (Settings → Secrets and variables → Actions): FTP_SERVIDOR, FTP_USUARIO y FTP_CLAVE.
 name: Subir a producción
 
@@ -31,9 +32,12 @@ jobs:
       - run: npm run build
 
       # Con lftp y no con FTP-Deploy-Action: contra Ferozo esa acción se cortaba en la primera conexión de datos
-      # (ECONNRESET) y abortaba todo; lftp reintenta. Primero sube todo out/ sin borrar nada (al lado están api/,
-      # assets/…) y después borra de _next/ lo que ya no está: los JS de las versiones anteriores.
-      - name: Subir out/ por FTP
+      # (ECONNRESET) y abortaba todo; lftp reintenta.
+      # 1. La API, antes que la web: así las pantallas nuevas no llaman a rutas que todavía no están. Sin borrar nada:
+      #    config.php (las claves) vive solo en el servidor. herramientas/ no se sube: se usa en la compu.
+      # 2. Todo out/ sin borrar nada (al lado están api/, assets/…).
+      # 3. Borra de _next/ lo que ya no está: los JS de las versiones anteriores.
+      - name: Subir la API y out/ por FTP
         env:
           FTP_SERVIDOR: ${{ secrets.FTP_SERVIDOR }}
           FTP_USUARIO: ${{ secrets.FTP_USUARIO }}
@@ -49,6 +53,7 @@ jobs:
           set net:reconnect-interval-base 5
           set net:timeout 30
           open --env-password -u \"$FTP_USUARIO\" \"$FTP_SERVIDOR\"
+          mirror -R --no-perms --overwrite --verbose --exclude ^herramientas/ api /public_html/launion/api
           mirror -R --no-perms --overwrite --verbose out /public_html/launion
           mirror -R --no-perms --verbose --delete --only-missing out/_next /public_html/launion/_next
           "

@@ -1,12 +1,14 @@
 "use client";
-// Alta y edición de un presupuesto: /admin/presupuestos/editar/?id=<id>. Sin id = nuevo; ?copiar=<id> = nuevo a partir de otro.
+// Alta y edición de un presupuesto: /admin/presupuestos/editar/?id=<id>. Sin id = nuevo; ?copiar=<id> = nuevo a partir de otro;
+// ?producto=<id> = nuevo, vinculado a ese modelo del catálogo.
 // Como en el Excel: total de un insumo = cantidad × costo unitario, costo = suma de los totales, precio = costo × multiplicador.
 // El precio final se pone a mano (redondeado). El despiece no entra en el costo: da los m² de cada material para calcular la placa.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type ChangeEvent } from "react";
 import { api, media, subir } from "@/lib/api";
-import { ars, dec, fechaHora, norm, parseDec, parsePesos, pesos, precioPresupuesto } from "@/lib/formato";
+import { useSesion } from "@/lib/sesion";
+import { ars, dec, fechaHora, medidas, norm, parseDec, parsePesos, pesos, precioPresupuesto } from "@/lib/formato";
 import type { Presupuesto, PresupuestoGuardar, Respuestas } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
 import { Modal } from "@/components/Modal";
@@ -26,6 +28,7 @@ interface FilaInsumo { insumo: string; cantidad: string; costo_unitario: string;
 interface Formulario {
   nombre: string;
   grupo: string;
+  producto_id: string;
   url_foto: string;
   notas: string;
   multiplicador: string;
@@ -37,12 +40,12 @@ interface Formulario {
 const clave = () => String(Math.random());
 const corteVacio = (): FilaCorte => ({ pieza: "", ancho_cm: "", alto_cm: "", cantidad: "1", material: "", k: clave() });
 const insumoVacio = (): FilaInsumo => ({ insumo: "", cantidad: "", costo_unitario: "", k: clave() });
-const NUEVO: Formulario = { nombre: "", grupo: "", url_foto: "", notas: "", multiplicador: "2,2", precio_final: "", cortes: [corteVacio()], insumos: [insumoVacio()] };
+const NUEVO: Formulario = { nombre: "", grupo: "", producto_id: "", url_foto: "", notas: "", multiplicador: "2,2", precio_final: "", cortes: [corteVacio()], insumos: [insumoVacio()] };
 
 const decTexto = (v: string | number | null) => (v == null ? "" : dec(v));
 function aFormulario(p: Presupuesto): Formulario {
   return {
-    nombre: p.nombre, grupo: p.grupo ?? "", url_foto: p.url_foto ?? "", notas: p.notas ?? "",
+    nombre: p.nombre, grupo: p.grupo ?? "", producto_id: p.producto_id ? String(p.producto_id) : "", url_foto: p.url_foto ?? "", notas: p.notas ?? "",
     multiplicador: dec(p.multiplicador), precio_final: p.precio_final == null ? "" : pesos(p.precio_final),
     cortes: p.cortes.length ? p.cortes.map((c) => ({ pieza: c.pieza ?? "", ancho_cm: decTexto(c.ancho_cm), alto_cm: decTexto(c.alto_cm), cantidad: String(c.cantidad), material: c.material ?? "", k: clave() })) : [corteVacio()],
     insumos: p.insumos.length ? p.insumos.map((x) => ({ insumo: x.insumo, cantidad: dec(x.cantidad), costo_unitario: pesos(x.costo_unitario), k: clave() })) : [insumoVacio()],
@@ -57,11 +60,14 @@ function Editar() {
   const parametros = useSearchParams();
   const id = Number(parametros.get("id")) || null; // null = nuevo
   const copiar = Number(parametros.get("copiar")) || null;
+  const producto = parametros.get("producto") ?? "";
   const router = useRouter();
   const avisar = useAviso();
+  const { puede } = useSesion();
   const [p, setP] = useState<Formulario | null>(null);
   const [guardado, setGuardado] = useState<Presupuesto | null>(null); // lo último guardado: nombre y fecha del encabezado
   const [otros, setOtros] = useState<Respuestas["presupuestos"] | null>(null); // grupos e insumos ya usados, para sugerirlos
+  const [catalogo, setCatalogo] = useState<Respuestas["catalogo"] | null>(null); // para vincular un modelo
   const [error, setError] = useState("");
   const [cambios, setCambios] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -72,15 +78,16 @@ function Editar() {
     setP(null);
     setCambios(false);
     const desde = id ?? copiar;
-    Promise.all([api("presupuestos"), desde ? api("presupuesto", { query: { id: String(desde) } }) : null]).then(([lista, r]) => {
+    Promise.all([api("presupuestos"), api("catalogo"), desde ? api("presupuesto", { query: { id: String(desde) } }) : null]).then(([lista, c, r]) => {
       setOtros(lista);
+      setCatalogo(c);
       setGuardado(id ? r?.presupuesto ?? null : null);
-      if (!r) return setP({ ...NUEVO, cortes: [corteVacio()], insumos: [insumoVacio()] });
+      if (!r) return setP({ ...NUEVO, producto_id: producto, cortes: [corteVacio()], insumos: [insumoVacio()] });
       const f = aFormulario(r.presupuesto);
       setP(copiar ? { ...f, nombre: `${f.nombre} (copia)` } : f);
       setCambios(!!copiar);
     }, (e: Error) => setError(e.message));
-  }, [id, copiar]);
+  }, [id, copiar, producto]);
 
   useEffect(() => {
     if (!cambios) return;
@@ -90,7 +97,7 @@ function Editar() {
   }, [cambios]);
 
   if (error) return <div className="empty card"><h2>{error}</h2><Link className="btn" href="/admin/presupuestos/">Volver a presupuestos</Link></div>;
-  if (!p || !otros) return <p className="muted">Cargando…</p>;
+  if (!p || !otros || !catalogo) return <p className="muted">Cargando…</p>;
 
   const cambiar = (cambio: Partial<Formulario>) => { setP((x) => x && { ...x, ...cambio }); setCambios(true); };
   const campo = (k: "nombre" | "grupo" | "notas") => ({
@@ -125,6 +132,10 @@ function Editar() {
   });
   const materiales = [...new Set(p.cortes.map((c) => c.material.trim()).filter(Boolean))];
   const grupos = [...new Set(otros.presupuestos.map((x) => x.grupo).filter(Boolean))];
+  // Modelos por ambiente; los eliminados no se ofrecen, salvo el que ya está vinculado
+  const ambienteDe = (categoria: number) => catalogo.categorias.find((c) => c.id === categoria)?.padre_id ?? categoria;
+  const modelos = catalogo.productos.filter((m) => !m.eliminado || String(m.id) === p.producto_id).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const modelo = catalogo.productos.find((m) => String(m.id) === p.producto_id);
 
   const hayMalos = malo(multiplicador) || malo(precioFinal) || insumos.some((x) => malo(x.cantidad) || malo(x.costo)) || cortes.some((c) => malo(c.ancho) || malo(c.alto) || malo(c.cantidad));
 
@@ -147,6 +158,7 @@ function Editar() {
       id,
       nombre: p.nombre,
       grupo: p.grupo,
+      producto_id: +p.producto_id || null,
       url_foto: p.url_foto,
       notas: p.notas,
       multiplicador,
@@ -208,6 +220,28 @@ function Editar() {
               <datalist id="grupos">{grupos.map((g) => <option key={g} value={g!} />)}</datalist>
               <small>Para ordenar la lista, como las hojas del Excel.</small>
             </label>
+            <label className="field"><span>Modelo del catálogo</span>
+              <select className="select" value={p.producto_id} onChange={(e) => cambiar({ producto_id: e.target.value })}>
+                <option value="">Ninguno</option>
+                {catalogo.categorias.filter((a) => a.padre_id === null).map((a) => (
+                  <optgroup key={a.id} label={a.nombre}>
+                    {modelos.filter((m) => ambienteDe(m.categoria_id) === a.id).map((m) => (
+                      <option key={m.id} value={m.id}>{[m.nombre, medidas(m), m.eliminado ? "eliminado" : ""].filter(Boolean).join(" · ")}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <small>El mueble de la web que se fabrica con este presupuesto. Desde el modelo se ve su costo y su precio final.</small>
+            </label>
+            {modelo && (
+              <div className="row" style={{ flexWrap: "nowrap" }}>
+                {modelo.foto ? <img className="thumb" src={media(modelo.foto)} alt="" /> : <span className="thumb" />}
+                <span className="small grow">
+                  {puede("catalogo.editar") ? <Link href={`/admin/catalogo/editar/?id=${modelo.id}`}>{modelo.nombre}</Link> : <b>{modelo.nombre}</b>}
+                  {modelo.precio_local && <span className="muted"> · Precio del local: {ars(modelo.precio_local)}</span>}
+                </span>
+              </div>
+            )}
           </section>
 
           <section className="card card-pad stack">

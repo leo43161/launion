@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type ChangeEvent } from "react";
 import { api, media, subir } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
-import { fechaHora, medidas, mensajeWhatsapp, num, parseArs } from "@/lib/formato";
+import { ars, fechaHora, medidas, mensajeWhatsapp, num, parseArs, precioPresupuesto } from "@/lib/formato";
 import type { Categoria, Producto, ProductoGuardar, TipoPrecio } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
 import { useAviso } from "@/components/Avisos";
@@ -244,6 +244,19 @@ function Editar() {
                 <small>Lo ven administradores y vendedores. No aparece en la web ni en el taller.</small></label>
             )}
           </section>
+
+          {guardado && (
+            <section className="card card-pad stack">
+              <div className="spread"><h2>Presupuestos de fabricación</h2>
+                <Link className="btn btn-sm" href={`/admin/presupuestos/editar/?producto=${guardado.id}`}><Icono n="plus" />Nuevo presupuesto</Link></div>
+              {guardado.presupuestos.length ? guardado.presupuestos.map((x) => (
+                <div key={x.id} className="spread small">
+                  <Link href={`/admin/presupuestos/editar/?id=${x.id}`}>{x.nombre}</Link>
+                  <span className="tnum">Costo {ars(x.costo)} · Precio <b>{ars(x.precio_final ?? precioPresupuesto(x.costo, x.multiplicador))}</b></span>
+                </div>
+              )) : <p className="small muted">Ninguno. Para vincular uno que ya existe, abrilo y elegí este modelo en “Modelo del catálogo”.</p>}
+            </section>
+          )}
         </div>
 
         <div className="stack">

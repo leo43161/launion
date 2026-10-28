@@ -38,6 +38,7 @@ function producto_ver() {
   $p['fotos'] = consulta('SELECT url FROM productos_fotos WHERE producto_id = ? ORDER BY orden', [$id])->fetchAll(PDO::FETCH_COLUMN);
   $p['precio_web'] = precio_vigente($id, LISTA_WEB);
   $p['precio_local'] = puede('precios.ver') ? (precio_vigente($id, LISTA_LOCAL)['monto'] ?? null) : null;
+  $p['presupuestos'] = consulta('SELECT p.id, p.nombre, p.multiplicador, p.precio_final, ' . COSTO_SQL . ' AS costo FROM presupuestos p WHERE p.producto_id = ? ORDER BY p.id', [$id])->fetchAll();
   salir(['producto' => $p]);
 }
 
