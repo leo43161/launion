@@ -42,3 +42,27 @@ export const normTelefono = (p: string): string => {
 
 export const norm = (s: string): string => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 export const iniciales = (n: string): string => n.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0]).join("").toUpperCase() || "?";
+
+const ND = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3, useGrouping: false });
+/** Cantidades y medidas con decimales, sin puntos de miles (así parseDec las vuelve a leer igual): 0.65 → "0,65", 1250 → "1250". */
+export const dec = (n: number | Monto): string => ND.format(Number(n) || 0);
+/** "0,65" o "0.65" → 0.65 (con coma, los puntos son de miles: "1.250,5" → 1250.5). Vacío → null; si no es un número, NaN. */
+export const parseDec = (s: string): number | null => {
+  const t = s.trim();
+  if (!t) return null;
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  return Number.isFinite(n) ? n : NaN;
+};
+/** Presupuestos: precio = costo × multiplicador, al centavo. */
+export const precioPresupuesto = (costo: number | Monto, multiplicador: number | Monto): number => Math.round(Number(costo) * Number(multiplicador) * 100) / 100;
+
+const NP = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+/** Pesos con centavos si los tiene, sin "$": 77000 → "77.000", 12.5 → "12,5". */
+export const pesos = (n: number | Monto): string => NP.format(Number(n) || 0);
+/** "77.000", "$ 77000" o "12,50" → número: los puntos son de miles y la coma, de los centavos. Vacío → null; si no es un número, NaN. */
+export const parsePesos = (s: string): number | null => {
+  const t = s.replace(/[$\s]/g, "");
+  if (!t) return null;
+  const n = Number(t.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : NaN;
+};

@@ -5,7 +5,12 @@
   - `app/admin/`: el **panel**, con su propio CSS (`app/admin.css`, sin Tailwind).
 - `lib/tipos.ts`: lo que manda y devuelve cada ruta de la API. Si cambia algo en PHP, se cambia acá y TypeScript marca cada pantalla que hay que ajustar.
 - `api/`: la API en PHP 7.4, con login por JWT. Lee y escribe la base `a0101073_launion`.
-- Por ahora: la web pública, y en el panel ingreso, **Catálogo** (alta, edición, fotos, video, precios, ocultar, eliminar y restaurar) y **Vendedores**.
+- Por ahora: la web pública, y en el panel:
+  - ingreso;
+  - **Catálogo**: alta, edición, fotos, video, precios, ocultar, eliminar y restaurar;
+  - **Vendedores**;
+  - **Presupuestos**: reemplazan la planilla de Excel. Despiece, insumos, costo, precio, precio final y foto; cualquier usuario los ve y edita;
+  - **Usuarios**: solo el administrador. Alta, edición, contraseña temporal y eliminación. Cada uno cambia la suya desde "Cambiar mi contraseña".
 
 ## Probar en la compu
 
@@ -44,7 +49,8 @@ La web está en `public_html/launion/`. El `.htaccess` de `public_html` manda `l
    1. `db/vaciar-base.sql`, solo mientras no haya datos reales.
    2. `db/base-de-datos.sql`.
    3. `db/datos-iniciales.sql`.
-   4. `db/prueba-completa.sql`. Tiene que dar "35 de 35 · TODO OK".
+   4. `db/prueba-completa.sql`. Tiene que dar "36 de 36 · TODO OK".
+   5. Opcional: `db/presupuestos-excel.sql`, con los 38 presupuestos de la planilla de Excel. Sus fotos están en `fotos-presupuestos.zip`, que se sube a `public_html/launion/assets/` y se descomprime ahí (crea `assets/presupuestos/`).
 2. **API**:
    1. Subí el contenido de `api/` a `public_html/launion/api/`. Incluye los ocultos `.htaccess` y `.user.ini`.
    2. Ahí mismo, copiá `config.example.php` como `config.php`.
@@ -79,6 +85,11 @@ Es el día del cambio: desde ahí la web muestra lo que está en la base, y `/ad
 Mientras la web nueva esté solo en `/dev`, la de la raíz sigue leyendo `data/productos.json` (lo que se carga en `/administracion`). Lo que se cambie en el panel nuevo se ve en `/dev`, no en la raíz.
 
 Para achicar las fotos del catálogo que pesan más de 500 KB (como hace la subida): `C:\xampp\php\php.exe api\herramientas\achicar-fotos.php ..\productos\fotos <salida>`. En la salida quedan solo las que cambiaron, con sus carpetas y nombres: se suben encima de `public_html/launion/assets/productos/fotos/`.
+
+Para volver a pasar la planilla de Excel de presupuestos (genera el .sql y deja las fotos en la carpeta, para zipear la carpeta `presupuestos`):
+```
+C:\xampp\php\php.exe api\herramientas\migrar-excel.php "..\doc-presupuesto\LISTA COMODAS (1) (1).xlsx" ..\db\presupuestos-excel.sql <carpeta>\presupuestos
+```
 
 Para regenerar los datos con lo último de `/administracion`:
 ```

@@ -1,11 +1,11 @@
 <?php
-/* Subida de fotos y videos del catálogo. Multipart con el campo "file" → {url: "assets/productos/subidos/<archivo>"} */
+/* Subida de fotos y videos (catálogo y presupuestos). Cualquier usuario del panel. Multipart con el campo "file" → {url: "assets/productos/subidos/<archivo>"} */
 
 const TIPOS_SUBIDA = ['jpg' => 'image/', 'jpeg' => 'image/', 'png' => 'image/', 'webp' => 'image/', 'mp4' => 'video/', 'webm' => 'video/'];
 const FOTO_MAXIMO = 500 * 1024; // las fotos más pesadas se recomprimen: la web tiene que cargar rápido con datos móviles
 
 function subir_archivo() {
-  exigir('catalogo.editar');
+  usuario();
   $f = $_FILES['file'] ?? null;
   if (!$f) fallar('El archivo es más grande que el máximo del servidor (' . ini_get('post_max_size') . ').', 413);
   if ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE)

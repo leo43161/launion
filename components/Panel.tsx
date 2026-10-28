@@ -21,7 +21,9 @@ interface ItemMenu {
 // Cada sección nueva se suma acá.
 const MENU: ItemMenu[] = [
   { href: "/admin/catalogo/", texto: "Catálogo", icono: "catalog" },
+  { href: "/admin/presupuestos/", texto: "Presupuestos", icono: "calc" },
   { href: "/admin/vendedores/", texto: "Vendedores", icono: "users", permiso: "catalogo.editar" },
+  { href: "/admin/usuarios/", texto: "Usuarios", icono: "key", permiso: "usuarios.editar" },
 ];
 
 function useTema(): [boolean, () => void] {
@@ -42,6 +44,7 @@ export function Panel({ children }: { children: ReactNode }) {
   const ruta = usePathname();
   const [oscuro, cambiarTema] = useTema();
   const [mas, setMas] = useState(false);
+  const [clave, setClave] = useState(false);
   if (!usuario) return null;
   const items = MENU.filter((m) => !m.permiso || puede(m.permiso));
   const actual = (m: ItemMenu) => (ruta.startsWith(m.href) ? "page" : undefined);
@@ -60,6 +63,7 @@ export function Panel({ children }: { children: ReactNode }) {
             <button className="btn btn-ghost btn-sm" type="button" onClick={cambiarTema}>{tema}</button>
             <button className="btn btn-ghost btn-sm" type="button" onClick={salir}><Icono n="logout" />Salir</button>
           </div>
+          <button className="btn btn-ghost btn-sm" type="button" style={{ justifySelf: "start" }} onClick={() => setClave(true)}><Icono n="key" />Cambiar mi contraseña</button>
         </div>
       </aside>
       <div className="main">
@@ -82,6 +86,7 @@ export function Panel({ children }: { children: ReactNode }) {
           <p className="muted" style={{ marginBottom: 12 }}>{usuario.rol}</p>
           <nav className="nav" style={{ display: "grid", gap: 2 }}>
             <a href={webPublica()} target="_blank" rel="noopener"><Icono n="ext" /><span>Ver la web pública</span></a>
+            <a href="#" onClick={(e) => { e.preventDefault(); setMas(false); setClave(true); }}><Icono n="key" /><span>Cambiar mi contraseña</span></a>
           </nav>
           <div className="row" style={{ marginTop: 14 }}>
             <button className="btn" type="button" onClick={() => { setMas(false); cambiarTema(); }}>{tema}</button>
@@ -89,13 +94,13 @@ export function Panel({ children }: { children: ReactNode }) {
           </div>
         </Modal>
       )}
-      {usuario.debe_cambiar_clave && <NuevaClave />}
+      {usuario.debe_cambiar_clave ? <NuevaClave /> : clave && <NuevaClave alCerrar={() => setClave(false)} />}
     </div>
   );
 }
 
-/** Primer ingreso con contraseña temporal: hay que elegir una propia. */
-function NuevaClave() {
+/** Primer ingreso con contraseña temporal: hay que elegir una propia. Con alCerrar, es el "Cambiar mi contraseña" del menú. */
+function NuevaClave({ alCerrar }: { alCerrar?: () => void }) {
   const { claveCambiada } = useSesion();
   const avisar = useAviso();
   const [error, setError] = useState("");
@@ -112,16 +117,17 @@ function NuevaClave() {
       await api("auth/clave", { body: { actual, nueva } });
       claveCambiada();
       avisar("Contraseña guardada");
+      alCerrar?.();
     } catch (err) {
       setError((err as Error).message);
       setEnviando(false);
     }
   }
   return (
-    <Modal titulo="Elegí tu contraseña" alCerrar={() => {}}>
+    <Modal titulo={alCerrar ? "Cambiar mi contraseña" : "Elegí tu contraseña"} alCerrar={alCerrar ?? (() => {})}>
       <form className="stack" onSubmit={guardar} noValidate>
-        <p className="muted">Es tu primer ingreso. Cambiá la contraseña temporal por una propia.</p>
-        <label className="field"><span>Contraseña temporal</span><input className="input" type="password" name="actual" autoComplete="current-password" required /></label>
+        {!alCerrar && <p className="muted">Es tu primer ingreso. Cambiá la contraseña temporal por una propia.</p>}
+        <label className="field"><span>{alCerrar ? "Contraseña actual" : "Contraseña temporal"}</span><input className="input" type="password" name="actual" autoComplete="current-password" required /></label>
         <label className="field"><span>Nueva contraseña</span><input className="input" type="password" name="nueva" minLength={8} autoComplete="new-password" required /></label>
         <label className="field"><span>Repetila</span><input className="input" type="password" name="repetida" autoComplete="new-password" required /></label>
         {error && <p className="small" style={{ color: "var(--bad)" }} role="alert">{error}</p>}

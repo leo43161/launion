@@ -487,3 +487,23 @@ a.li:hover { background: var(--surface-2); }
 @media(max-width:900px){.table.cards img[data-mthumb]{display:block!important}}
 .cap1::first-letter { text-transform: uppercase; }
 .qr-fallback { display: block; max-width: 160px; font-size: 11px; word-break: break-all; color: var(--muted); }
+
+/* ---------- Presupuestos: filas editables de insumos y despiece ---------- */
+@media (min-width: 1081px) { .cat-form.pres { grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr); } }
+.lineas { display: grid; gap: 6px; }
+.lineas .ln { display: grid; gap: 6px; align-items: center; }
+.lineas.insumos .ln { grid-template-columns: 72px minmax(0, 1fr) 130px 104px 38px; grid-template-areas: "c n u t x"; }
+.lineas.cortes .ln { grid-template-columns: minmax(0, 1.2fr) 72px 72px 56px minmax(0, 1fr) 52px 38px; grid-template-areas: "p a h c m s x"; }
+.lineas .cab { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.lineas .input, .lineas .input-money input { height: 36px; }
+.lineas .input { padding: 0 8px; }
+.lineas .input-money { padding-left: 8px; }
+.lineas .input-money input { padding: 0 8px 0 4px; }
+.lineas .tot { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.input-money:has(input[aria-invalid="true"]) { border-color: var(--bad); }
+@media (max-width: 560px) {
+  .lineas .cab { display: none; }
+  .lineas .ln { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .lineas.insumos .ln { grid-template-columns: 64px minmax(0, 1fr) minmax(0, .8fr) 38px; grid-template-areas: "n n n x" "c u t t"; }
+  .lineas.cortes .ln { grid-template-columns: repeat(3, minmax(0, 1fr)) 38px; grid-template-areas: "p p m x" "a h c s"; }
+}

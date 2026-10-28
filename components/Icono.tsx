@@ -25,6 +25,10 @@ const ICONOS = {
   menu: P("M4 7h16M4 12h16M4 17h16"),
   link: P("M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"),
   ext: P("M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"),
+  calc: `<rect x="5" y="3" width="14" height="18" rx="2"/>` + P("M8.5 7h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h.01M15.5 18h.01"),
+  key: `<circle cx="8" cy="15" r="4"/>` + P("M10.8 12.2 20 3M17 6l3 3M14.5 8.5l2 2"),
+  copy: `<rect x="9" y="9" width="11" height="11" rx="2"/>` + P("M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"),
+  edit: P("M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"),
 };
 export type NombreIcono = keyof typeof ICONOS;
 
