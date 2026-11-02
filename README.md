@@ -3,7 +3,7 @@
 - `app/`, `components/`, `lib/`: la web y el panel, en Next.js con TypeScript, exportados en estático (`npm run build` revisa los tipos y deja todo en `out/`).
   - `app/(web)/` y `components/web/`: la **web pública**, con el mismo diseño de `muebleria/index.html` pasado a Tailwind (colores y temas en `app/(web)/web.css`). Lee el catálogo de la API (ruta `web`, sin token).
     - Link de vendedor: `/valentina` pone su WhatsApp en todos los botones.
-    - Link de catálogo: `/?catalogo=dormitorio&tipo=placares` (o `/martin?catalogo=kiosco`, con vendedor) muestra solo esos modelos, sin banners ni otros ambientes. Lo arma el botón "Mandar este catálogo" del listado.
+    - Link de catálogo: `/?catalogo=dormitorio&tipo=placares` (o `/martin?catalogo=kiosco`, con vendedor) muestra solo esos modelos, sin banners ni otros ambientes. Lo arma el botón "Compartir por WhatsApp" del listado.
   - `app/admin/`: el **panel**, con su propio CSS (`app/admin.css`, sin Tailwind).
 - `lib/tipos.ts`: lo que manda y devuelve cada ruta de la API. Si cambia algo en PHP, se cambia acá y TypeScript marca cada pantalla que hay que ajustar.
 - `api/`: la API en PHP 7.4, con login por JWT. Lee y escribe la base `a0101073_launion`.

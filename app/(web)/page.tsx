@@ -17,7 +17,7 @@ import { FOTOS, GRUPOS_TRABAJO, PUBLICOS, TELEFONO, anchoDe, armarCatalogo, esLe
 // Sin vendedor, o con uno que no existe: el número de la mueblería.
 const VENDEDOR = typeof location === "undefined" ? "" : (location.pathname.split("/").filter(Boolean).pop() || "").toLowerCase();
 // Link de catálogo (…/?catalogo=dormitorio&tipo=placares, también con vendedor: …/pilar?catalogo=kiosco): abre el listado
-// con solo esos modelos, sin banners, "Combina bien" ni "Seguí mirando". Lo arma el botón "Mandar este catálogo".
+// con solo esos modelos, sin banners, "Combina bien" ni "Seguí mirando". Lo arma el botón "Compartir por WhatsApp".
 const PEDIDO = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
 const CATALOGO = (PEDIDO.get("catalogo") || "").toLowerCase();
 const slug = (t: string): string => norm(t).trim().replace(/\s+/g, "-"); // "Mesas de luz" → "mesas-de-luz"
@@ -693,7 +693,7 @@ export default function Web() {
                 {amb && !e.q && (
                   <a className={`${BTN_SM} justify-self-start mt-1`} target="_blank" rel="noopener"
                     href={`https://wa.me/?text=${encodeURIComponent(`${e.tipo || amb.nombre} · La Unión Muebles\n${location.origin}${location.pathname}?catalogo=${amb.slug}${e.tipo ? `&tipo=${slug(e.tipo)}` : ""}`)}`}>
-                    <I n="wa" />Mandar este catálogo
+                    <I n="wa" />Compartir por WhatsApp
                   </a>
                 )}
               </div>
