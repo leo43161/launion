@@ -2,6 +2,8 @@
 
 - `app/`, `components/`, `lib/`: la web y el panel, en Next.js con TypeScript, exportados en estático (`npm run build` revisa los tipos y deja todo en `out/`).
   - `app/(web)/` y `components/web/`: la **web pública**, con el mismo diseño de `muebleria/index.html` pasado a Tailwind (colores y temas en `app/(web)/web.css`). Lee el catálogo de la API (ruta `web`, sin token).
+    - Link de vendedor: `/valentina` pone su WhatsApp en todos los botones.
+    - Link de catálogo: `/?catalogo=dormitorio&tipo=placares` (o `/martin?catalogo=kiosco`, con vendedor) muestra solo esos modelos, sin banners ni otros ambientes. Lo arma el botón "Mandar este catálogo" del listado.
   - `app/admin/`: el **panel**, con su propio CSS (`app/admin.css`, sin Tailwind).
 - `lib/tipos.ts`: lo que manda y devuelve cada ruta de la API. Si cambia algo en PHP, se cambia acá y TypeScript marca cada pantalla que hay que ajustar.
 - `api/`: la API en PHP 7.4, con login por JWT. Lee y escribe la base `a0101073_launion`.
@@ -44,7 +46,7 @@ La web está en `public_html/launion/`. El `.htaccess` de `public_html` manda `l
 - `config.php` no está en el repo: se crea a mano una sola vez en el servidor (paso 2 de abajo).
 - Para volver a correrlo sin hacer push: Actions → Subir a producción → Run workflow.
 
-### Primero: prueba en /dev
+### Desde cero (o para probar en /dev)
 
 1. **Base**: en phpMyAdmin, base `a0101073_launion`, Importar, en este orden:
    1. `db/vaciar-base.sql`, solo mientras no haya datos reales.
@@ -70,29 +72,16 @@ La web está en `public_html/launion/`. El `.htaccess` de `public_html` manda `l
 
    Si después de ingresar te devuelve al ingreso, el servidor no le pasa el token a PHP: avisá.
 
-### Después: pasar a la raíz
+### La raíz: ya está
 
-Es el día del cambio: desde ahí la web muestra lo que está en la base, y `/administracion` deja de usarse. Si en `/administracion` se cargaron cambios después de importar la base, regenerá los datos con el `productos.json` de ese día (abajo) e importalos.
-
-1. **Armá** la versión final: `npm run build` (sin `:dev`).
-2. **Guardá una copia** de `public_html/launion/index.html` y `public_html/launion/.htaccess` (la web anterior), por si hay que volver.
-3. **Borrá** `public_html/launion/admin/`, que es el panel de demostración.
-4. **Subí el contenido de `out/`** a `public_html/launion/`, reemplazando. Incluye:
-   - el `index.html` nuevo, que reemplaza a la web anterior;
-   - el `.htaccess` (sale de `public/.htaccess`), que es el anterior sin las reglas del panel de demostración.
-5. **Borrá** `public_html/launion/dev/`.
-6. Cuando la web nueva ande bien, borrá `public_html/launion/administracion/`, para que nadie cargue cambios ahí por error.
-
-Mientras la web nueva esté solo en `/dev`, la de la raíz sigue leyendo `data/productos.json` (lo que se carga en `/administracion`). Lo que se cambie en el panel nuevo se ve en `/dev`, no en la raíz.
+Desde el 27/10/2026 el Actions sube la web nueva a la raíz: muestra lo que está en la base, y `/administracion` ya no se usa (guarda en `data/productos.json`, que nadie lee). Queda borrar a mano en Ferozo lo de la web anterior, porque el Actions no borra nada fuera de `_next/`:
+- `public_html/launion/dev/`;
+- `public_html/launion/administracion/`, para que nadie cargue cambios ahí por error;
+- `public_html/launion/data/` (antes bajate una copia de `productos.json`, por las dudas) y `public_html/launion/assets/js/admin/` (el panel de demostración).
 
 Para achicar las fotos del catálogo que pesan más de 500 KB (como hace la subida): `C:\xampp\php\php.exe api\herramientas\achicar-fotos.php ..\productos\fotos <salida>`. En la salida quedan solo las que cambiaron, con sus carpetas y nombres: se suben encima de `public_html/launion/assets/productos/fotos/`.
 
 Para volver a pasar la planilla de Excel de presupuestos (genera el .sql y deja las fotos en la carpeta, para zipear la carpeta `presupuestos`):
 ```
 C:\xampp\php\php.exe api\herramientas\migrar-excel.php "..\doc-presupuesto\LISTA COMODAS (1) (1).xlsx" ..\db\presupuestos-excel.sql <carpeta>\presupuestos
-```
-
-Para regenerar los datos con lo último de `/administracion`:
-```
-C:\xampp\php\php.exe api\herramientas\migrar-json.php <productos.json del servidor> ..\db\datos-iniciales.sql "<hash del admin en administracion/api.php>"
 ```

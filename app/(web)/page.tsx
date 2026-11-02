@@ -16,12 +16,17 @@ import { FOTOS, GRUPOS_TRABAJO, PUBLICOS, TELEFONO, anchoDe, armarCatalogo, esLe
 // Link de vendedor (…/pilar, …/juan): todos los WhatsApp de la página van a su número. Se lee apenas carga la página.
 // Sin vendedor, o con uno que no existe: el número de la mueblería.
 const VENDEDOR = typeof location === "undefined" ? "" : (location.pathname.split("/").filter(Boolean).pop() || "").toLowerCase();
+// Link de catálogo (…/?catalogo=dormitorio&tipo=placares, también con vendedor: …/pilar?catalogo=kiosco): abre el listado
+// con solo esos modelos, sin banners, "Combina bien" ni "Seguí mirando". Lo arma el botón "Mandar este catálogo".
+const PEDIDO = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
+const CATALOGO = (PEDIDO.get("catalogo") || "").toLowerCase();
+const slug = (t: string): string => norm(t).trim().replace(/\s+/g, "-"); // "Mesas de luz" → "mesas-de-luz"
 
 const TEMAS = [["claro", "Claro"], ["gris", "Gris"], ["oscuro", "Oscuro"]] as const;
 type Tema = (typeof TEMAS)[number][0];
 type Medida = "all" | "s" | "m" | "l";
 type Orden = "rec" | "wa" | "wd";
-type Estado = { vista: "inicio" | "resultados"; publico: Publico | null; ambiente: string | null; tipo: string | null; medida: Medida; orden: Orden; q: string };
+type Estado = { vista: "inicio" | "resultados"; publico: Publico | null; ambiente: string | null; tipo: string | null; medida: Medida; orden: Orden; q: string; solo: boolean };
 type Hoja = { modelo: Modelo } | { trabajo: TrabajoWeb } | null;
 
 const MEDIDAS: [Medida, string][] = [["all", "Cualquier medida"], ["s", "Chico · hasta 80 cm"], ["m", "Mediano · 81 a 150 cm"], ["l", "Grande · más de 150 cm"]];
@@ -81,6 +86,7 @@ function filtrar(c: Catalogo, e: Estado): Modelo[] {
 type Segmento = { primero?: true; ambiente?: string; titulo?: string; items: Modelo[] };
 function segmentos(c: Catalogo, e: Estado, primeros: Modelo[]): Segmento[] {
   const usados = new Set(primeros.map((p) => p.id)), segs: Segmento[] = [{ primero: true, items: primeros }];
+  if (e.solo) return segs;
   const amb = e.ambiente ? c.R[e.ambiente] : null;
   let orden: string[] = [];
   if (e.q) orden = c.ambientes.map((r) => r.slug);
@@ -117,7 +123,7 @@ function armarFeed(c: Catalogo, e: Estado, segs: Segmento[], total: number): Pie
     if (!seg.items.length) { s++; k = 0; continue; }
     out.push({ k: "modelo", p: seg.items[k++] });
     n++; quedan--;
-    if (n % 8 === 0) corte();
+    if (n % 8 === 0 && !e.solo) corte();
     if (k >= seg.items.length) { s++; k = 0; }
   }
   if (s >= segs.length) out.push({ k: "fin" });
@@ -218,7 +224,7 @@ function Combina({ cat, slug, irAmbiente }: { cat: Catalogo; slug: string; irAmb
 
 export default function Web() {
   const [cat, setCat] = useState<Catalogo | null>(null);
-  const [e, setE] = useState<Estado>({ vista: "inicio", publico: null, ambiente: null, tipo: null, medida: "all", orden: "rec", q: "" });
+  const [e, setE] = useState<Estado>({ vista: "inicio", publico: null, ambiente: null, tipo: null, medida: "all", orden: "rec", q: "", solo: false });
   const [cuantos, setCuantos] = useState(12); // tarjetas mostradas en el listado: suben de a 12 al bajar
   const [busqueda, setBusqueda] = useState("");
   const [cajon, setCajon] = useState(false); // el menú del celular
@@ -239,7 +245,14 @@ export default function Web() {
   }
 
   useEffect(() => {
-    api("web").then((d) => setCat(armarCatalogo(d))).catch((err: Error) => mostrarAviso(err.message));
+    if (CATALOGO) setE((x) => ({ ...x, vista: "resultados", solo: true })); // así no se ve el inicio mientras carga
+    api("web").then((d) => {
+      const c = armarCatalogo(d), a = c.ambientes.find((r) => r.slug === CATALOGO);
+      setCat(c);
+      if (CATALOGO) setE((x) => a
+        ? { ...x, ambiente: a.slug, publico: a.publico, tipo: a.tipos.find((t) => slug(t) === slug(PEDIDO.get("tipo") || "")) || null }
+        : { ...x, vista: "inicio", solo: false });
+    }).catch((err: Error) => mostrarAviso(err.message));
     let t = "claro";
     try { t = localStorage.getItem("lu-theme") || "claro"; } catch {}
     setTema(TEMAS.some((x) => x[0] === t) ? (t as Tema) : "claro");
@@ -257,7 +270,7 @@ export default function Web() {
 
   /* navegación: sin cambiar la dirección, como la web anterior */
   function navegar(cambios: Partial<Estado>, ancla?: string) {
-    flushSync(() => { setE((x) => ({ ...x, ...cambios })); setCuantos(12); });
+    flushSync(() => { setE((x) => ({ ...x, solo: false, ...cambios })); setCuantos(12); });
     if (ancla) document.querySelector(ancla)?.scrollIntoView({ block: "start" });
     else scrollTo({ top: 0 });
   }
@@ -656,7 +669,7 @@ export default function Web() {
           </div>
 
           {/* ---------- LISTADO ---------- */}
-          <div hidden={e.vista !== "resultados"}>
+          <div hidden={e.vista !== "resultados" || !cat}>
             <div className={WRAP_P}>
               <nav className="flex gap-1.5 flex-wrap text-[13.5px] text-muted pt-[18px]" aria-label="Estás en">
                 <button className="cursor-pointer text-gold-ink font-semibold" onClick={() => irInicio()}>Inicio</button>
@@ -672,6 +685,13 @@ export default function Web() {
                 <p className="text-muted max-w-[58ch]">
                   {e.q ? "Buscamos en todo el catálogo, para casa y para negocios." : amb ? amb.frase : pub === "casa" ? "Todo lo que hacemos para tu casa, ambiente por ambiente." : "Todo lo que hacemos para negocios, rubro por rubro."}
                 </p>
+                {/* el link de este catálogo (con el vendedor, si se entró por su link), para mandarlo a quien se elija en WhatsApp */}
+                {amb && !e.q && (
+                  <a className={`${BTN_SM} justify-self-start mt-1`} target="_blank" rel="noopener"
+                    href={`https://wa.me/?text=${encodeURIComponent(`${e.tipo || amb.nombre} · La Unión Muebles\n${location.origin}${location.pathname}?catalogo=${amb.slug}${e.tipo ? `&tipo=${slug(e.tipo)}` : ""}`)}`}>
+                    <I n="wa" />Mandar este catálogo
+                  </a>
+                )}
               </div>
               <button className={`${BTN_SM} mb-3 lg:hidden`} onClick={() => abrirCajon()}><I n="menu" />Ver categorías</button>
               <div className="grid gap-2.5 mb-3 [&>*]:min-w-0">
