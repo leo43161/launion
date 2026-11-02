@@ -139,9 +139,11 @@ export function Tarjeta({ p, modo }: { p: Modelo; modo: ModoTarjeta }) {
   const { wa, abrir } = useAcciones();
   const chips = etiquetas(p), precio = precioTexto(p.precio);
   const enFila = modo === "carrusel" || modo === "relacionado"; // en las filas va más compacta: sin frase ni etiquetas
+  const [video, setVideo] = useState(false); // con el mouse encima, el video del modelo tapa las fotos (en el celular no: al tocar se abre la ficha)
   return (
     <article tabIndex={0} aria-label={p.nombre}
       className={`relative min-w-0 cursor-pointer bg-surface border border-line rounded-lg p-2.5 transition-[box-shadow,border-color] duration-[.25s] hover:shadow-suave hover:border-[color-mix(in_srgb,var(--gold)_45%,var(--line))] ${CAJA[modo]}`}
+      onPointerEnter={(e) => setVideo(e.pointerType === "mouse")} onPointerLeave={() => setVideo(false)}
       onClick={(e) => { if (!(e.target as Element).closest("a")) abrir(p); }}
       onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); abrir(p); } }}>
       <div className={`${MEDIA} rounded-2xl ${FOTO[modo]}`}>
@@ -149,6 +151,7 @@ export function Tarjeta({ p, modo }: { p: Modelo; modo: ModoTarjeta }) {
         <span className="absolute top-[9px] left-[9px] z-2 text-[11px] font-bold tracking-[.03em] py-1 px-[9px] rounded-full bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] text-ink max-w-[calc(100%-60px)] whitespace-nowrap overflow-hidden text-ellipsis">{p.variante || p.tipo}</span>
         {p.fotos.length > 1 && <span className={`${CONTADOR} top-[9px] right-[9px]`} aria-label={`${p.fotos.length} fotos`}><I n="photos" />{p.fotos.length}</span>}
         <Diapositivas fotos={p.fotos.slice(0, 6)} alt={(j) => `${p.nombre}, foto ${j + 1}`} />
+        {video && p.url_video && <video src={media(p.url_video)} autoPlay muted loop playsInline aria-hidden="true" className="absolute inset-0 z-1 w-full h-full object-cover" />}
       </div>
       <div className="flex flex-col gap-[5px] min-w-0 pt-0.5 px-1 pb-1 flex-1 max-lg:justify-center">
         <h3 className={`leading-[1.2] ${enFila ? "text-[16.5px]" : modo === "inicio" ? "text-[16.5px] max-sm:text-[18px]" : "text-[18px]"}`}>{p.nombre}</h3>
