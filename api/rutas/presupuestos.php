@@ -1,10 +1,11 @@
 <?php
 /* Presupuestos de fabricación: despiece e insumos de un mueble, con su costo y precio. Reemplazan la planilla de Excel.
-   Total de un insumo = cantidad × costo unitario. Costo = suma de los totales. Precio = costo × multiplicador (2,2 en el Excel).
+   Total de un insumo = cantidad × costo unitario × porcentual (vacío = 100 %: melamina $100.000 al 50 % = $50.000).
+   Costo = suma de los totales. Precio = costo × multiplicador (2,2 en el Excel).
    El precio final se redondea a mano. Los ve y los edita cualquier usuario del panel.
    Se pueden vincular a un modelo del catálogo (producto_id): el modelo muestra sus presupuestos (producto_ver). */
 
-const COSTO_SQL = '(SELECT ROUND(COALESCE(SUM(i.cantidad * i.costo_unitario), 0), 2) FROM presupuestos_insumos i WHERE i.presupuesto_id = p.id)';
+const COSTO_SQL = '(SELECT ROUND(COALESCE(SUM(i.cantidad * i.costo_unitario * COALESCE(i.porcentaje, 100) / 100), 0), 2) FROM presupuestos_insumos i WHERE i.presupuesto_id = p.id)';
 
 function presupuestos_listar() {
   usuario();
@@ -26,7 +27,7 @@ function presupuesto_ver() {
   $p = consulta('SELECT p.*, ' . COSTO_SQL . ' AS costo FROM presupuestos p WHERE p.id = ?', [$id])->fetch();
   if (!$p) fallar('No existe ese presupuesto.', 404);
   $p['cortes'] = consulta('SELECT pieza, ancho_cm, alto_cm, cantidad, material FROM presupuestos_cortes WHERE presupuesto_id = ? ORDER BY orden, id', [$id])->fetchAll();
-  $p['insumos'] = consulta('SELECT insumo, cantidad, costo_unitario FROM presupuestos_insumos WHERE presupuesto_id = ? ORDER BY orden, id', [$id])->fetchAll();
+  $p['insumos'] = consulta('SELECT insumo, cantidad, costo_unitario, porcentaje FROM presupuestos_insumos WHERE presupuesto_id = ? ORDER BY orden, id', [$id])->fetchAll();
   salir(['presupuesto' => $p]);
 }
 
@@ -76,6 +77,7 @@ function presupuesto_guardar() {
       'insumo' => texto($x, 'insumo', 80, "Insumo $n"),
       'cantidad' => numero($x, 'cantidad', 0, 9999999, "Insumo $n, cantidad") ?? 0,
       'costo_unitario' => numero($x, 'costo_unitario', 0, 999999999999, "Insumo $n, costo unitario") ?? 0,
+      'porcentaje' => numero($x, 'porcentaje', 0, 1000, "Insumo $n, porcentual"), // vacío = 100 %
     ];
     if ($fila['insumo'] === null) {
       if ($fila['cantidad'] || $fila['costo_unitario']) fallar("Insumo $n: falta el nombre.");
@@ -101,8 +103,8 @@ function presupuesto_guardar() {
     consulta('INSERT INTO presupuestos_cortes (presupuesto_id, orden, pieza, ancho_cm, alto_cm, cantidad, material) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [$id, $i, $c['pieza'], $c['ancho_cm'], $c['alto_cm'], $c['cantidad'], $c['material']]);
   foreach ($insumos as $i => $x)
-    consulta('INSERT INTO presupuestos_insumos (presupuesto_id, orden, insumo, cantidad, costo_unitario) VALUES (?, ?, ?, ?, ?)',
-      [$id, $i, $x['insumo'], $x['cantidad'], $x['costo_unitario']]);
+    consulta('INSERT INTO presupuestos_insumos (presupuesto_id, orden, insumo, cantidad, costo_unitario, porcentaje) VALUES (?, ?, ?, ?, ?, ?)',
+      [$id, $i, $x['insumo'], $x['cantidad'], $x['costo_unitario'], $x['porcentaje']]);
   db()->commit();
   salir(['id' => $id]);
 }

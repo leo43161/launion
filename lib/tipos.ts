@@ -155,6 +155,7 @@ export interface Insumo {
   insumo: string;
   cantidad: Monto;
   costo_unitario: Monto;
+  porcentaje: Monto | null; // porcentual: la parte del total que entra en el costo. null = 100 %
 }
 
 /** Presupuesto completo (presupuesto_ver). */
@@ -186,7 +187,7 @@ export interface PresupuestoGuardar {
   multiplicador: number;
   precio_final: number | null;
   cortes: { pieza: string; ancho_cm: number | null; alto_cm: number | null; cantidad: number | null; material: string }[];
-  insumos: { insumo: string; cantidad: number | null; costo_unitario: number | null }[];
+  insumos: { insumo: string; cantidad: number | null; costo_unitario: number | null; porcentaje: number | null }[];
 }
 
 /* ---------- usuarios (solo con usuarios.editar) ---------- */

@@ -1,7 +1,8 @@
 "use client";
 // Alta y edición de un presupuesto: /admin/presupuestos/editar/?id=<id>. Sin id = nuevo; ?copiar=<id> = nuevo a partir de otro;
 // ?producto=<id> = nuevo, vinculado a ese modelo del catálogo.
-// Como en el Excel: total de un insumo = cantidad × costo unitario, costo = suma de los totales, precio = costo × multiplicador.
+// Como en el Excel: total de un insumo = cantidad × costo unitario, y con porcentual entra solo esa parte (melamina $100.000 al 50 % = $50.000).
+// Costo = suma de esos totales, precio = costo × multiplicador.
 // El precio final se pone a mano (redondeado). El despiece no entra en el costo: da los m² de cada material para calcular la placa.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +25,7 @@ const PLACA_M2 = (PLACA.ancho * PLACA.alto) / 10000;
 
 /** El formulario guarda todo como texto, como lo escribe la persona. Se convierte al calcular y al guardar. */
 interface FilaCorte { pieza: string; ancho_cm: string; alto_cm: string; cantidad: string; material: string; k: string }
-interface FilaInsumo { insumo: string; cantidad: string; costo_unitario: string; k: string }
+interface FilaInsumo { insumo: string; cantidad: string; costo_unitario: string; porcentaje: string; k: string }
 interface Formulario {
   nombre: string;
   grupo: string;
@@ -39,7 +40,7 @@ interface Formulario {
 
 const clave = () => String(Math.random());
 const corteVacio = (): FilaCorte => ({ pieza: "", ancho_cm: "", alto_cm: "", cantidad: "1", material: "", k: clave() });
-const insumoVacio = (): FilaInsumo => ({ insumo: "", cantidad: "", costo_unitario: "", k: clave() });
+const insumoVacio = (): FilaInsumo => ({ insumo: "", cantidad: "", costo_unitario: "", porcentaje: "", k: clave() });
 const NUEVO: Formulario = { nombre: "", grupo: "", producto_id: "", url_foto: "", notas: "", multiplicador: "2,2", precio_final: "", cortes: [corteVacio()], insumos: [insumoVacio()] };
 
 const decTexto = (v: string | number | null) => (v == null ? "" : dec(v));
@@ -48,7 +49,7 @@ function aFormulario(p: Presupuesto): Formulario {
     nombre: p.nombre, grupo: p.grupo ?? "", producto_id: p.producto_id ? String(p.producto_id) : "", url_foto: p.url_foto ?? "", notas: p.notas ?? "",
     multiplicador: dec(p.multiplicador), precio_final: p.precio_final == null ? "" : pesos(p.precio_final),
     cortes: p.cortes.length ? p.cortes.map((c) => ({ pieza: c.pieza ?? "", ancho_cm: decTexto(c.ancho_cm), alto_cm: decTexto(c.alto_cm), cantidad: String(c.cantidad), material: c.material ?? "", k: clave() })) : [corteVacio()],
-    insumos: p.insumos.length ? p.insumos.map((x) => ({ insumo: x.insumo, cantidad: dec(x.cantidad), costo_unitario: pesos(x.costo_unitario), k: clave() })) : [insumoVacio()],
+    insumos: p.insumos.length ? p.insumos.map((x) => ({ insumo: x.insumo, cantidad: dec(x.cantidad), costo_unitario: pesos(x.costo_unitario), porcentaje: decTexto(x.porcentaje), k: clave() })) : [insumoVacio()],
   };
 }
 
@@ -113,9 +114,10 @@ function Editar() {
   };
 
   // Cuentas: las mismas del Excel
-  const insumos = p.insumos.map((x) => ({ cantidad: parseDec(x.cantidad), costo: parsePesos(x.costo_unitario) }));
+  const insumos = p.insumos.map((x) => ({ cantidad: parseDec(x.cantidad), costo: parsePesos(x.costo_unitario), porcentaje: parseDec(x.porcentaje.replace("%", "")) }));
   const totales = insumos.map((x) => n(x.cantidad) * n(x.costo));
-  const costo = Math.round(totales.reduce((a, b) => a + b, 0) * 100) / 100;
+  const conPorcentaje = insumos.map((x, i) => (x.porcentaje == null ? totales[i] : (totales[i] * n(x.porcentaje)) / 100)); // vacío = 100 %
+  const costo = Math.round(conPorcentaje.reduce((a, b) => a + b, 0) * 100) / 100;
   const multiplicador = parseDec(p.multiplicador);
   const precio = precioPresupuesto(costo, n(multiplicador));
   const redondeado = Math.ceil(precio / 1000) * 1000;
@@ -137,7 +139,7 @@ function Editar() {
   const modelos = catalogo.productos.filter((m) => !m.eliminado || String(m.id) === p.producto_id).sort((a, b) => a.nombre.localeCompare(b.nombre));
   const modelo = catalogo.productos.find((m) => String(m.id) === p.producto_id);
 
-  const hayMalos = malo(multiplicador) || malo(precioFinal) || insumos.some((x) => malo(x.cantidad) || malo(x.costo)) || cortes.some((c) => malo(c.ancho) || malo(c.alto) || malo(c.cantidad));
+  const hayMalos = malo(multiplicador) || malo(precioFinal) || insumos.some((x) => malo(x.cantidad) || malo(x.costo) || malo(x.porcentaje)) || cortes.some((c) => malo(c.ancho) || malo(c.alto) || malo(c.cantidad));
 
   async function subirFoto(archivo: File) {
     try {
@@ -164,7 +166,7 @@ function Editar() {
       multiplicador,
       precio_final: precioFinal,
       cortes: p.cortes.map((c, i) => ({ pieza: c.pieza, ancho_cm: cortes[i].ancho, alto_cm: cortes[i].alto, cantidad: cortes[i].cantidad, material: c.material })),
-      insumos: p.insumos.map((x, i) => ({ insumo: x.insumo, cantidad: insumos[i].cantidad, costo_unitario: insumos[i].costo })),
+      insumos: p.insumos.map((x, i) => ({ insumo: x.insumo, cantidad: insumos[i].cantidad, costo_unitario: insumos[i].costo, porcentaje: insumos[i].porcentaje })),
     };
     setGuardando(true);
     try {
@@ -245,9 +247,12 @@ function Editar() {
           </section>
 
           <section className="card card-pad stack">
-            <div className="spread"><h2>Insumos</h2><span className="small muted">Total = cantidad × costo unitario</span></div>
+            <div className="spread"><h2>Insumos</h2><span className="small muted">Total = cantidad × costo unitario. Con porcentual, entra esa parte (vacío = 100 %).</span></div>
             <div className="lineas insumos">
-              <div className="ln cab" aria-hidden="true"><span style={{ gridArea: "c" }}>Cant.</span><span style={{ gridArea: "n" }}>Insumo</span><span style={{ gridArea: "u" }}>Costo unit.</span><span style={{ gridArea: "t" }} className="tot">Total</span></div>
+              <div className="ln cab" aria-hidden="true">
+                <span style={{ gridArea: "c" }}>Cant.</span><span style={{ gridArea: "n" }}>Insumo</span><span style={{ gridArea: "u" }}>Costo unit.</span><span style={{ gridArea: "t" }} className="tot">Total</span>
+                <span style={{ gridArea: "p", paddingLeft: 8 }}>Porc.</span><span style={{ gridArea: "f" }} className="tot">Total</span>
+              </div>
               {p.insumos.map((x, i) => (
                 <div className="ln" key={x.k}>
                   <input className="input" style={{ gridArea: "c" }} inputMode="decimal" placeholder="Cant." aria-label={`Cantidad del insumo ${i + 1}`} value={x.cantidad} {...numeroMalo(insumos[i].cantidad)}
@@ -259,6 +264,10 @@ function Editar() {
                       onChange={(e) => cambiarInsumo(i, { costo_unitario: e.target.value })}
                       onBlur={(e) => { const v = parsePesos(e.target.value); if (v != null && Number.isFinite(v)) cambiarInsumo(i, { costo_unitario: pesos(v) }); }} /></span>
                   <span className="tot" style={{ gridArea: "t" }}>{ars(totales[i])}</span>
+                  <span className="input-money" style={{ gridArea: "p" }}>
+                    <input inputMode="decimal" placeholder="100" aria-label={`Porcentual del insumo ${i + 1}`} value={x.porcentaje} {...numeroMalo(insumos[i].porcentaje)}
+                      onChange={(e) => cambiarInsumo(i, { porcentaje: e.target.value })} /><span>%</span></span>
+                  <span className="tot" style={{ gridArea: "f" }}>{ars(conPorcentaje[i])}</span>
                   <button className="icon-btn" style={{ gridArea: "x" }} type="button" title="Quitar" aria-label={`Quitar insumo ${i + 1}`}
                     onClick={() => cambiar({ insumos: p.insumos.length > 1 ? p.insumos.filter((_, j) => j !== i) : [insumoVacio()] })}><Icono n="trash" /></button>
                 </div>

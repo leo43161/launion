@@ -11,7 +11,7 @@
   - ingreso;
   - **Catálogo**: alta, edición, fotos, video, precios, ocultar, eliminar y restaurar;
   - **Vendedores**;
-  - **Presupuestos**: reemplazan la planilla de Excel. Despiece, insumos, costo, precio, precio final y foto; cualquier usuario los ve y edita. Cada uno se puede vincular a un modelo del catálogo, que muestra sus presupuestos;
+  - **Presupuestos**: reemplazan la planilla de Excel. Despiece, insumos (con porcentual: la parte del total que entra en el costo), costo, precio, precio final y foto; cualquier usuario los ve y edita. Cada uno se puede vincular a un modelo del catálogo, que muestra sus presupuestos;
   - **Usuarios**: solo el administrador. Alta, edición, contraseña temporal y eliminación. Cada uno cambia la suya desde "Cambiar mi contraseña".
 
 ## Probar en la compu
