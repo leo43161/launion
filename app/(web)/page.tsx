@@ -103,7 +103,8 @@ function segmentos(c: Catalogo, e: Estado, primeros: Modelo[]): Segmento[] {
   return segs;
 }
 
-/** Las primeras `total` tarjetas del listado, con un corte cada 8: un ambiente que combina o un banner, alternados. */
+/** Las primeras `total` tarjetas del listado, con cortes (un ambiente que combina o un banner, alternados): uno al terminar lo pedido,
+    para no taparlo, y después uno cada 8. Con un link de catálogo hay un solo segmento: no hay cortes. */
 type Pieza = { k: "modelo"; p: Modelo } | { k: "seccion"; s: Segmento } | { k: "banner"; n: number } | { k: "combina"; ambiente: string } | { k: "fin" };
 function armarFeed(c: Catalogo, e: Estado, segs: Segmento[], total: number): Pieza[] {
   const out: Pieza[] = [], mostrados = new Set<string>();
@@ -122,9 +123,12 @@ function armarFeed(c: Catalogo, e: Estado, segs: Segmento[], total: number): Pie
     if (k === 0 && !seg.primero) out.push({ k: "seccion", s: seg });
     if (!seg.items.length) { s++; k = 0; continue; }
     out.push({ k: "modelo", p: seg.items[k++] });
-    n++; quedan--;
-    if (n % 8 === 0 && !e.solo) corte();
-    if (k >= seg.items.length) { s++; k = 0; }
+    quedan--;
+    if (!seg.primero && ++n % 8 === 0) corte();
+    if (k >= seg.items.length) {
+      if (seg.primero && s + 1 < segs.length) corte();
+      s++; k = 0;
+    }
   }
   if (s >= segs.length) out.push({ k: "fin" });
   return out;
