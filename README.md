@@ -9,6 +9,8 @@
 - `api/`: la API en PHP 7.4, con login por JWT. Lee y escribe la base `a0101073_launion`.
 - Por ahora: la web pública, y en el panel:
   - ingreso;
+  - **Ventas**: el formulario de 5 pasos de la ficha en papel (vendedor y cliente, datos comerciales, muebles, entrega y plan de pago, revisar), la lista, la ficha de cada venta con sus cobros e historial, y la hoja A4 para que el cliente firme. Pide `db/arreglo-ventas.sql`;
+  - **Configuración**: solo el administrador. Cuentas bancarias, posnets con sus recargos y localidades, que usa el formulario de venta;
   - **Catálogo**: alta, edición, fotos, video, precios, ocultar, eliminar y restaurar;
   - **Vendedores**;
   - **Presupuestos**: reemplazan la planilla de Excel. Despiece, insumos (con porcentual: la parte del total que entra en el costo), costo, precio, precio final y foto; cualquier usuario los ve y edita. Cada uno se puede vincular a un modelo del catálogo, que muestra sus presupuestos;
@@ -52,7 +54,7 @@ La web está en `public_html/launion/`. El `.htaccess` de `public_html` manda `l
    1. `db/vaciar-base.sql`, solo mientras no haya datos reales.
    2. `db/base-de-datos.sql`.
    3. `db/datos-iniciales.sql`.
-   4. `db/prueba-completa.sql`. Tiene que dar "36 de 36 · TODO OK".
+   4. `db/prueba-completa.sql`. Tiene que dar "41 de 41 · TODO OK".
    5. Opcional: `db/presupuestos-excel.sql`, con los 38 presupuestos de la planilla de Excel. Sus fotos están en `fotos-presupuestos.zip`, que se sube a `public_html/launion/assets/` y se descomprime ahí (crea `assets/presupuestos/`).
 2. **API**:
    1. Subí el contenido de `api/` a `public_html/launion/api/`. Incluye los ocultos `.htaccess` y `.user.ini`.

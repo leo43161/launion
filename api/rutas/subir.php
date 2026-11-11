@@ -1,5 +1,6 @@
 <?php
-/* Subida de fotos y videos (catálogo y presupuestos). Cualquier usuario del panel. Multipart con el campo "file" → {url: "assets/productos/subidos/<archivo>"} */
+/* Subida de fotos y videos (catálogo, presupuestos y ventas). Cualquier usuario del panel. Multipart con el campo "file" →
+   {url: "assets/productos/subidos/<archivo>"}, o con ?carpeta=ventas → {url: "assets/ventas/<32 letras y números>.<ext>"} */
 
 const TIPOS_SUBIDA = ['jpg' => 'image/', 'jpeg' => 'image/', 'png' => 'image/', 'webp' => 'image/', 'mp4' => 'video/', 'webm' => 'video/'];
 const FOTO_MAXIMO = 500 * 1024; // las fotos más pesadas se recomprimen: la web tiene que cargar rápido con datos móviles
@@ -20,14 +21,16 @@ function subir_archivo() {
   $liviana = TIPOS_SUBIDA[$ext] === 'image/' && filesize($f['tmp_name']) > FOTO_MAXIMO ? foto_liviana($f['tmp_name']) : null;
   if ($liviana !== null) $ext = 'jpg';
 
-  // Nombre nuevo: solo a-z, 0-9 y guiones + extensión permitida (nunca puede quedar algo ejecutable como .php)
+  // Nombre nuevo: solo a-z, 0-9 y guiones + extensión permitida (nunca puede quedar algo ejecutable como .php).
+  // Las fotos de una venta (?carpeta=ventas: la casa del cliente, croquis) van aparte y con un nombre imposible de adivinar
+  $ventas = ($_GET['carpeta'] ?? '') === 'ventas';
   $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(pathinfo($f['name'], PATHINFO_FILENAME))), '-') ?: 'archivo';
-  $nombre = substr($base, 0, 60) . '-' . bin2hex(random_bytes(3)) . '.' . $ext;
-  $destino = CFG['carpeta_subidos'] . '/' . $nombre;
-  if (!is_dir(CFG['carpeta_subidos'])) mkdir(CFG['carpeta_subidos'], 0755, true);
-  if (!($liviana !== null ? file_put_contents($destino, $liviana) : move_uploaded_file($f['tmp_name'], $destino)))
-    fallar('No se pudo guardar el archivo. Revisá los permisos de assets/productos.', 500);
-  salir(['url' => "assets/productos/subidos/$nombre"]);
+  $nombre = ($ventas ? bin2hex(random_bytes(16)) : substr($base, 0, 60) . '-' . bin2hex(random_bytes(3))) . '.' . $ext;
+  $carpeta = $ventas ? dirname(CFG['carpeta_subidos'], 2) . '/ventas' : CFG['carpeta_subidos'];
+  if (!is_dir($carpeta)) mkdir($carpeta, 0755, true);
+  if (!($liviana !== null ? file_put_contents("$carpeta/$nombre", $liviana) : move_uploaded_file($f['tmp_name'], "$carpeta/$nombre")))
+    fallar('No se pudo guardar el archivo. Revisá los permisos de la carpeta assets.', 500);
+  salir(['url' => ($ventas ? 'assets/ventas/' : 'assets/productos/subidos/') . $nombre]);
 }
 
 /** La foto como JPEG de hasta FOTO_MAXIMO, perdiendo lo menos posible: primero prueba en su tamaño con calidad 90, 85 y 80

@@ -108,7 +108,7 @@ START TRANSACTION;
 "
   . insertar('roles', [
     ['id' => 1, 'nombre' => 'Administrador', 'descripcion' => 'Todo el sistema', 'permisos' => '["*"]', 'es_sistema' => 1],
-    ['id' => 2, 'nombre' => 'Vendedor', 'descripcion' => 'Catálogo con precios del local', 'permisos' => '["precios.ver"]', 'es_sistema' => 1],
+    ['id' => 2, 'nombre' => 'Vendedor', 'descripcion' => 'Catálogo con precios del local', 'permisos' => '["precios.ver", "ventas.crear"]', 'es_sistema' => 1],
     ['id' => 3, 'nombre' => 'Taller', 'descripcion' => 'Catálogo sin precios', 'permisos' => '[]', 'es_sistema' => 1],
   ])
   . insertar('usuarios', [['id' => 1, 'rol_id' => 1, 'nombre_usuario' => 'admin', 'clave_hash' => $hash, 'debe_cambiar_clave' => $clave ? 1 : 0]])

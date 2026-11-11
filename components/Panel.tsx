@@ -20,10 +20,12 @@ interface ItemMenu {
 
 // Cada sección nueva se suma acá.
 const MENU: ItemMenu[] = [
+  { href: "/admin/ventas/", texto: "Ventas", icono: "orders", permiso: "ventas.crear" },
   { href: "/admin/catalogo/", texto: "Catálogo", icono: "catalog" },
   { href: "/admin/presupuestos/", texto: "Presupuestos", icono: "calc" },
   { href: "/admin/vendedores/", texto: "Vendedores", icono: "users", permiso: "catalogo.editar" },
   { href: "/admin/usuarios/", texto: "Usuarios", icono: "key", permiso: "usuarios.editar" },
+  { href: "/admin/configuracion/", texto: "Configuración", icono: "settings", permiso: "configuracion.editar" },
 ];
 
 function useTema(): [boolean, () => void] {
@@ -47,6 +49,7 @@ export function Panel({ children }: { children: ReactNode }) {
   const [clave, setClave] = useState(false);
   if (!usuario) return null;
   const items = MENU.filter((m) => !m.permiso || puede(m.permiso));
+  const abajo = items.slice(0, 4); // en el celular: las primeras 4 abajo y el resto en "Más"
   const actual = (m: ItemMenu) => (ruta.startsWith(m.href) ? "page" : undefined);
   const tema = <><Icono n={oscuro ? "sun" : "moon"} />{oscuro ? "Modo claro" : "Modo oscuro"}</>;
 
@@ -76,8 +79,8 @@ export function Panel({ children }: { children: ReactNode }) {
         </header>
         <main className="content" id="view" tabIndex={-1}>{children}</main>
       </div>
-      <nav className="bottom-nav" style={{ "--n": items.length + 1 } as CSSProperties} aria-label="Menú">
-        {items.map((m) => <Link key={m.href} href={m.href} aria-current={actual(m)}><Icono n={m.icono} /><span>{m.texto}</span></Link>)}
+      <nav className="bottom-nav" style={{ "--n": abajo.length + 1 } as CSSProperties} aria-label="Menú">
+        {abajo.map((m) => <Link key={m.href} href={m.href} aria-current={actual(m)}><Icono n={m.icono} /><span>{m.texto}</span></Link>)}
         <button type="button" onClick={() => setMas(true)}><Icono n="menu" /><span>Más</span></button>
       </nav>
 
@@ -85,6 +88,7 @@ export function Panel({ children }: { children: ReactNode }) {
         <Modal titulo={usuario.nombre} alCerrar={() => setMas(false)}>
           <p className="muted" style={{ marginBottom: 12 }}>{usuario.rol}</p>
           <nav className="nav" style={{ display: "grid", gap: 2 }}>
+            {items.slice(abajo.length).map((m) => <Link key={m.href} href={m.href} onClick={() => setMas(false)}><Icono n={m.icono} /><span>{m.texto}</span></Link>)}
             <a href={webPublica()} target="_blank" rel="noopener"><Icono n="ext" /><span>Ver la web pública</span></a>
             <a href="#" onClick={(e) => { e.preventDefault(); setMas(false); setClave(true); }}><Icono n="key" /><span>Cambiar mi contraseña</span></a>
           </nav>

@@ -15,6 +15,9 @@ RewriteRule ^ https://launionmuebles.com.ar%{REQUEST_URI} [R=301,L]
 # Precios del local de la web anterior (/administracion): no se abren desde la web.
 RewriteRule ^data/privado(/|$) - [F]
 
+# Fotos y croquis de las ventas (assets/ventas): cada archivo se abre con su nombre aleatorio, pero la carpeta no se lista.
+RewriteRule ^assets/ventas/?$ - [F]
+
 # Archivos que no son parte de la web: copias .zip, notas y config de Vercel/local.
 RewriteRule (\.(zip|md|ini)|^serve\.json|^vercel\.json)$ - [F,NC]
 

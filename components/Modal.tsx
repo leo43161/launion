@@ -17,7 +17,10 @@ export function Modal({ titulo, children, pie, ancho = false, alCerrar }: Props)
   useEffect(() => {
     const previo = document.activeElement as HTMLElement | null;
     document.body.style.overflow = "hidden";
-    const t = setTimeout(() => raiz.current?.querySelector<HTMLElement>("[autofocus], input, select, textarea, .modal-foot .btn-primary, .modal-head button")?.focus(), 30);
+    const t = setTimeout(() => {
+      if (raiz.current?.contains(document.activeElement)) return; // un campo con autoFocus ya lo tiene
+      raiz.current?.querySelector<HTMLElement>("[autofocus], input, select, textarea, .modal-foot .btn-primary, .modal-head button")?.focus();
+    }, 30);
     return () => {
       clearTimeout(t);
       document.body.style.overflow = "";

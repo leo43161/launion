@@ -416,7 +416,25 @@ a.li:hover { background: var(--surface-2); }
   .print-bar { display: none !important; }
   body { background: #fff; }
   .print-page { padding: 0; }
+  /* La hoja se abre dentro del panel: al imprimir sale sola */
+  .side, .topbar, .bottom-nav, .toasts { display: none !important; }
+  .main { margin-left: 0; }
+  .content { padding: 0; max-width: none; }
 }
+
+/* ---------- Ficha de venta impresa: hoja A4 con los 4 bloques de la ficha en papel y las firmas ---------- */
+@page { size: A4; margin: 12mm; }
+.ficha h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; border-bottom: 1.5px solid #111; padding-bottom: 3px; margin: 16px 0 6px; break-after: avoid; }
+.ficha .datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.ficha .datos > div { display: flex; gap: 6px; border-bottom: 1px dotted #999; padding: 4px 0; min-height: 24px; }
+.ficha .datos > div.ancho { grid-column: 1 / -1; }
+.ficha .datos span { color: #555; white-space: nowrap; }
+.ficha table { width: 100%; border-collapse: collapse; }
+.ficha th, .ficha td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; }
+.ficha th { background: #f3f3f3; font-size: 11.5px; }
+.ficha td.num, .ficha th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ficha .firmas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 56px; break-inside: avoid; }
+.ficha .firmas div { border-top: 1px solid #111; padding-top: 4px; text-align: center; font-size: 12px; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1080px) {
@@ -495,7 +513,7 @@ a.li:hover { background: var(--surface-2); }
 .lineas.insumos .ln { grid-template-columns: 60px minmax(0, 1fr) 108px 88px 68px 88px 38px; grid-template-areas: "c n u t p f x"; }
 .lineas.cortes .ln { grid-template-columns: minmax(0, 1.2fr) 72px 72px 56px minmax(0, 1fr) 52px 38px; grid-template-areas: "p a h c m s x"; }
 .lineas .cab { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.lineas .input, .lineas .input-money input { height: 36px; }
+.lineas .input, .lineas .select, .lineas .input-money input { height: 36px; }
 .lineas .input { padding: 0 8px; }
 .lineas .input-money { padding-left: 8px; }
 .lineas .input-money input { padding: 0 8px 0 4px; }
@@ -503,7 +521,12 @@ a.li:hover { background: var(--surface-2); }
 .lineas .input-money input + span { padding-right: 8px; } /* el % va después del número */
 .lineas .tot { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .input-money:has(input[aria-invalid="true"]) { border-color: var(--bad); }
+/* Configuración: planes de los posnets y localidades */
+.lineas.planes .ln { grid-template-columns: 112px minmax(0, 1fr) 72px 96px 84px 38px; grid-template-areas: "t m c r a x"; }
+.lineas.localidades .ln { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 88px 100px 38px; grid-template-areas: "n p a c x"; }
 @media (max-width: 560px) {
+  .lineas.planes .ln { grid-template-columns: repeat(3, minmax(0, 1fr)) 38px; grid-template-areas: "t m m x" "c r a a"; }
+  .lineas.localidades .ln { grid-template-columns: repeat(3, minmax(0, 1fr)) 38px; grid-template-areas: "n n n x" "p a c c"; }
   .lineas .cab { display: none; }
   .lineas .ln { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
   .lineas.insumos .ln { grid-template-columns: 64px minmax(0, 1fr) minmax(0, .8fr) 38px; grid-template-areas: "n n n x" "c u t t" "p f f f"; }

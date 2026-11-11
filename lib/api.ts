@@ -45,13 +45,14 @@ export async function api(ruta: keyof Respuestas, { body, query }: { body?: unkn
   return datos;
 }
 
-/** Sube una foto o video y devuelve su ruta. XHR y no fetch: fetch no informa el avance de la subida, y un video tarda. */
-export function subir(archivo: File, alAvanzar?: (fraccion: number) => void): Promise<string> {
+/** Sube una foto o video y devuelve su ruta. XHR y no fetch: fetch no informa el avance de la subida, y un video tarda.
+    carpeta "ventas": fotos del cliente, aparte del catálogo y con un nombre imposible de adivinar. */
+export function subir(archivo: File, alAvanzar?: (fraccion: number) => void, carpeta?: "ventas"): Promise<string> {
   return new Promise((ok, mal) => {
     const x = new XMLHttpRequest();
     const fd = new FormData();
     fd.append("file", archivo);
-    x.open("POST", direccion("subir"));
+    x.open("POST", direccion("subir", carpeta && { carpeta }));
     const token = leerToken();
     if (token) x.setRequestHeader("Authorization", `Bearer ${token}`);
     x.upload.onprogress = (e) => e.lengthComputable && alAvanzar?.(e.loaded / e.total);

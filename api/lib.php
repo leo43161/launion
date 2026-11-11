@@ -84,7 +84,7 @@ function usuario() {
   $h = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
   $d = preg_match('/^Bearer\s+(\S+)$/', $h, $m) ? token_leer($m[1]) : null;
   if ($d) $u = consulta(
-    "SELECT u.id, u.nombre_usuario, u.debe_cambiar_clave, r.nombre AS rol, r.permisos, TRIM(CONCAT_WS(' ', p.nombre, p.apellido)) AS nombre
+    "SELECT u.id, u.empleado_id, u.nombre_usuario, u.debe_cambiar_clave, r.nombre AS rol, r.permisos, TRIM(CONCAT_WS(' ', p.nombre, p.apellido)) AS nombre
      FROM usuarios u JOIN roles r ON r.id = u.rol_id
      LEFT JOIN empleados e ON e.id = u.empleado_id LEFT JOIN personas p ON p.id = e.persona_id
      WHERE u.id = ? AND u.activo = 1", [$d['sub']])->fetch();

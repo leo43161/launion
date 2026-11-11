@@ -10,6 +10,14 @@ const FH = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", ho
 /** "2026-10-26 10:46:00" (como lo manda MySQL) → "26 oct, 10:46" */
 export const fechaHora = (v: string | null): string => (v ? FH.format(new Date(v.replace(" ", "T"))).replace(".", "") : "—");
 
+const FD = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", year: "numeric" });
+/** "2026-12-03" (o con hora) → "3 dic 2026". Sin la "T", new Date() leería el día en UTC y mostraría el anterior. */
+export const fecha = (v: string | null): string => (v ? FD.format(new Date(v.slice(0, 10) + "T00:00")).replace(".", "") : "—");
+/** Hoy como "2026-11-11", en la hora de la compu (no en UTC). */
+export const hoyISO = (): string => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+/** 143 → "LU-0143" */
+export const numeroVenta = (n: number): string => `LU-${String(n).padStart(4, "0")}`;
+
 /** "80 × 160 × 40 cm", "Alto 75 · Ø 60 cm" o el texto si no tiene medidas fijas. */
 export function medidas(p: Medidas): string {
   if (p.diametro_cm) return [p.alto_cm && `Alto ${p.alto_cm}`, `Ø ${p.diametro_cm}`].filter(Boolean).join(" · ") + " cm";

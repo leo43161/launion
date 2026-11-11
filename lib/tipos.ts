@@ -4,10 +4,11 @@
 
 export type Bit = 0 | 1;
 export type Monto = string;
-export type Permiso = "*" | "catalogo.editar" | "precios.ver" | "usuarios.editar";
+export type Permiso = "*" | "catalogo.editar" | "precios.ver" | "usuarios.editar" | "ventas.crear" | "ventas.anular" | "configuracion.editar";
 
 export interface Usuario {
   id: number;
+  empleado_id: number | null; // null = cuenta sin empleado (el admin inicial): al vender elige el vendedor
   nombre_usuario: string;
   nombre: string;
   rol: string;
@@ -227,6 +228,239 @@ export interface UsuarioGuardar {
   empleado_id: number | null; // solo en el alta
 }
 
+/* ---------- ventas (ventas.crear; cancelar y anular cobros: ventas.anular) ---------- */
+// Total = renglones − descuento, sin recargos de tarjeta. Saldo = total − pagado. El crédito de la casa cuenta como pagado
+// (la deuda la siguen ellos con el Crédito Nº): "financiado" es esa parte.
+
+export type EstadoVenta = "activa" | "pausa" | "cancelada";
+export type TipoEntrega = "envio" | "retiro";
+export type EstadoCivil = "soltero" | "casado" | "union_convivencial" | "divorciado" | "viudo";
+export type Frecuencia = "semanal" | "quincenal" | "mensual";
+export type TipoMedio = "efectivo" | "transferencia" | "tarjeta_debito" | "tarjeta_credito" | "credito_casa" | "otro";
+
+/** Fila de la lista (ventas_listar). */
+export interface VentaFila {
+  id: number;
+  numero: number; // se muestra LU-0001: numeroVenta()
+  vendido_en: string;
+  fecha_entrega: string;
+  tipo_entrega: TipoEntrega;
+  estado: EstadoVenta;
+  total: Monto;
+  pagado: Monto;
+  financiado: Monto; // la parte en cuotas del crédito de la casa (ya cuenta en pagado)
+  entregado_en: string | null;
+  vendedor_id: number;
+  vendedor: string;
+  cliente: string;
+  dni: string | null;
+  telefono: string | null;
+  localidad: string | null;
+  muebles: string | null; // "Cómoda · 2× Mesa de luz"
+}
+
+export interface Direccion {
+  id: number;
+  calle: string;
+  numero: string | null;
+  piso: string | null;
+  departamento: string | null;
+  barrio: string | null;
+  localidad_id: number;
+  localidad: string;
+  provincia: string;
+}
+
+export interface Cliente {
+  id: number;
+  persona_id: number;
+  tipo: "casa" | "negocio";
+  margen_credito: Monto | null;
+  nombre: string;
+  apellido: string;
+  dni: string | null;
+  estado_civil: EstadoCivil | null;
+  fecha_nacimiento: string | null;
+  telefonos: { numero_completo: string; es_whatsapp: Bit }[]; // el primero es el principal
+  email: string | null;
+  direccion: Direccion | null;
+  comercio: { nombre_comercio: string | null; rubro: string | null; direccion: Direccion | null } | null;
+}
+
+/** Resultado de la búsqueda por nombre, DNI o teléfono. */
+export interface ClienteFila {
+  id: number;
+  nombre: string;
+  dni: string | null;
+  telefono: string | null;
+  localidad: string | null;
+}
+
+export interface VentaItem {
+  id: number;
+  producto_id: number | null; // null = a medida
+  codigo: string | null;
+  nombre: string;
+  descripcion: string | null;
+  cantidad: number;
+  precio_unitario: Monto;
+  notas_taller: string | null;
+  url_foto: string | null; // la del catálogo
+  adjuntos: string[]; // fotos o croquis del cliente
+}
+
+export interface Cobro {
+  id: number;
+  concepto: "sena" | "anticipo" | "saldo" | "pago_total" | "pago_a_cuenta";
+  monto: Monto; // lo que cancela de la venta
+  recargo_pct: Monto;
+  recargo_monto: Monto;
+  total_cobrado: Monto; // monto + recargo
+  cuotas: number | null;
+  monto_cuota: Monto | null;
+  frecuencia_cuotas: Frecuencia | null;
+  fecha_primer_vencimiento: string | null;
+  referencia: string | null; // Nº de operación, cupón o Crédito Nº
+  cobrado_en: string;
+  anulado_en: string | null;
+  motivo_anulacion: string | null;
+  medio: string;
+  medio_tipo: TipoMedio;
+  cuenta: string | null;
+  posnet: string | null;
+  cobrado_por: string;
+}
+
+/** La venta completa (venta_ver). */
+export interface Venta {
+  id: number;
+  numero: number;
+  codigo_seguimiento: string;
+  cliente_id: number;
+  vendedor_id: number;
+  vendedor: string;
+  vendido_en: string;
+  fecha_entrega: string;
+  tipo_entrega: TipoEntrega;
+  direccion_entrega: Direccion | null; // null si retira
+  estado: EstadoVenta;
+  motivo_estado: string | null;
+  subtotal: Monto;
+  descuento: Monto;
+  total: Monto;
+  pagado: Monto;
+  financiado: Monto;
+  notas: string | null;
+  entregado_en: string | null;
+  cancelado_en: string | null;
+  cliente: Cliente;
+  items: VentaItem[];
+  cobros: Cobro[];
+  historial: { texto: string; creado_en: string; usuario: string }[];
+}
+
+export interface PlanVenta { id: number; posnet: string; tipo_tarjeta: TipoTarjeta; marca_tarjeta: string | null; cuotas: number; recargo_pct: Monto }
+
+/** Las listas del formulario (venta/nueva). */
+export interface OpcionesVenta {
+  localidades: Omit<Localidad, "codigo_postal">[];
+  medios: { id: number; nombre: string; tipo: TipoMedio }[];
+  cuentas: { id: number; nombre: string }[];
+  planes: PlanVenta[];
+  vendedores: { id: number; nombre: string }[];
+  rubros: string[];
+}
+
+export interface DireccionGuardar { calle: string; numero: string; piso: string; departamento: string; barrio: string; localidad_id: number | null }
+/** Un pago: anticipo al vender o cobro después. Con transferencia, la cuenta; con tarjeta, el plan del posnet (da el recargo). */
+export interface PagoGuardar { medio_pago_id: number; monto: number | null; cuenta_bancaria_id: number | null; posnet_plan_id: number | null; referencia: string }
+
+/** Lo que recibe venta/guardar. cliente.id null = cliente nuevo (si el DNI ya existe, es esa persona). */
+export interface VentaGuardar {
+  vendedor_id: number | null;
+  cliente: {
+    id: number | null;
+    nombre: string;
+    apellido: string;
+    dni: string;
+    estado_civil: EstadoCivil | "";
+    fecha_nacimiento: string;
+    telefonos: { numero_completo: string; es_whatsapp: boolean }[];
+    email: string;
+    direccion: DireccionGuardar;
+    margen_credito: number | null;
+    tipo: "casa" | "negocio";
+    comercio: { nombre_comercio: string; rubro: string; direccion: DireccionGuardar } | null;
+  };
+  items: { producto_id: number | null; codigo: string; nombre: string; descripcion: string; cantidad: number | null; precio_unitario: number | null; notas_taller: string; adjuntos: string[] }[];
+  fecha_entrega: string;
+  tipo_entrega: TipoEntrega;
+  descuento: number | null;
+  notas: string;
+  pagos: PagoGuardar[];
+  credito: { cuotas: number | null; monto_cuota: number | null; frecuencia_cuotas: Frecuencia | ""; fecha_primer_vencimiento: string; referencia: string } | null;
+}
+
+/* ---------- configuración del negocio (solo con configuracion.editar) ---------- */
+
+export interface CuentaBancaria {
+  id: number;
+  nombre: string; // nombre corto: Macro, Mercado Pago
+  banco: string | null;
+  titular: string | null;
+  cbu_cvu: string | null;
+  alias: string | null;
+  activo: Bit;
+}
+
+export type TipoTarjeta = "debito" | "credito";
+
+/** Recargo de un posnet según la tarjeta y las cuotas. */
+export interface PlanPosnet {
+  id: number;
+  posnet_id: number;
+  tipo_tarjeta: TipoTarjeta;
+  marca_tarjeta: string | null; // null = todas
+  cuotas: number;
+  recargo_pct: Monto;
+  activo: Bit;
+}
+
+export interface Posnet {
+  id: number;
+  nombre: string;
+  proveedor: string | null;
+  cuenta_liquidacion_id: number | null;
+  activo: Bit;
+  planes: PlanPosnet[];
+}
+
+export interface Localidad {
+  id: number;
+  nombre: string;
+  provincia: string;
+  codigo_area: string | null; // sin el 0: "381"
+  codigo_postal: string | null;
+}
+
+export interface Configuracion {
+  cuentas: CuentaBancaria[];
+  posnets: Posnet[];
+  localidades: Localidad[];
+}
+
+/** Cada lista se manda completa: sin id = nueva; la que no viene se borra (o se desactiva si ya la usa una venta). */
+export interface CuentaGuardar { id?: number; nombre: string; banco: string; titular: string; cbu_cvu: string; alias: string; activo: boolean }
+export interface PosnetGuardar {
+  id?: number;
+  nombre: string;
+  proveedor: string;
+  cuenta_liquidacion_id: number | null;
+  activo: boolean;
+  planes: { id?: number; tipo_tarjeta: TipoTarjeta; marca_tarjeta: string; cuotas: number | null; recargo_pct: number | null; activo: boolean }[];
+}
+export interface LocalidadGuardar { id?: number; nombre: string; provincia: string; codigo_area: string; codigo_postal: string }
+
 /* ---------- web pública (ruta "web", sin token) ---------- */
 
 /** Ambiente con los tipos de mueble que tienen modelos visibles, en orden. */
@@ -283,6 +517,19 @@ export interface Respuestas {
   usuarios: { usuarios: UsuarioFila[]; roles: Rol[]; empleados: EmpleadoLibre[] };
   "usuario/guardar": { id: number };
   "usuario/eliminar": { eliminado: boolean }; // false = tenía cambios a su nombre: quedó desactivado
+  ventas: { ventas: VentaFila[] };
+  venta: { venta: Venta };
+  "venta/nueva": OpcionesVenta;
+  "venta/guardar": { id: number; numero: number };
+  "venta/cobro": { ok: true };
+  "venta/anular-cobro": { ok: true };
+  "venta/estado": { ok: true };
+  clientes: { clientes: ClienteFila[] };
+  cliente: { cliente: Cliente; ventas: { id: number; numero: number }[] }; // sus ventas anteriores
+  configuracion: Configuracion;
+  "configuracion/cuentas": Configuracion;
+  "configuracion/posnets": Configuracion;
+  "configuracion/localidades": Configuracion;
   web: { ambientes: AmbienteWeb[]; modelos: ModeloWeb[]; trabajos: TrabajoWeb[]; vendedores: Record<string, string> }; // vendedores: link → WhatsApp
 }
 
@@ -297,4 +544,11 @@ export interface Pedidos {
   "presupuesto/eliminar": { id: number };
   "usuario/guardar": UsuarioGuardar;
   "usuario/eliminar": { id: number };
+  "venta/guardar": VentaGuardar;
+  "venta/cobro": PagoGuardar & { venta_id: number };
+  "venta/anular-cobro": { cobro_id: number; motivo: string };
+  "venta/estado": { id: number; estado?: EstadoVenta; motivo?: string; fecha_entrega?: string; entregada?: boolean };
+  "configuracion/cuentas": { cuentas: CuentaGuardar[] };
+  "configuracion/posnets": { posnets: PosnetGuardar[] };
+  "configuracion/localidades": { localidades: LocalidadGuardar[] };
 }
