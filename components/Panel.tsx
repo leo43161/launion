@@ -21,9 +21,11 @@ interface ItemMenu {
 // Cada sección nueva se suma acá.
 const MENU: ItemMenu[] = [
   { href: "/admin/ventas/", texto: "Ventas", icono: "orders", permiso: "ventas.crear" },
+  { href: "/admin/clientes/", texto: "Clientes", icono: "users", permiso: "ventas.crear" },
+  { href: "/admin/caja/", texto: "Caja", icono: "cash", permiso: "caja.usar" },
   { href: "/admin/catalogo/", texto: "Catálogo", icono: "catalog" },
   { href: "/admin/presupuestos/", texto: "Presupuestos", icono: "calc" },
-  { href: "/admin/vendedores/", texto: "Vendedores", icono: "users", permiso: "catalogo.editar" },
+  { href: "/admin/vendedores/", texto: "Vendedores", icono: "link", permiso: "catalogo.editar" },
   { href: "/admin/usuarios/", texto: "Usuarios", icono: "key", permiso: "usuarios.editar" },
   { href: "/admin/configuracion/", texto: "Configuración", icono: "settings", permiso: "configuracion.editar" },
 ];

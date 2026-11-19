@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "local": "node scripts/local.mjs",
+    "local:base": "node scripts/local.mjs --base-nueva",
     "build": "next build",
     "build:dev": "next build"
   },

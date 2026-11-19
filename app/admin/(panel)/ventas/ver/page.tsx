@@ -3,12 +3,13 @@
 // Acciones: nueva fecha de entrega, pausa, entregada y cancelar (cancelar y anular cobros: solo con ventas.anular).
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { api, media } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
 import { ars, fecha, fechaHora, parsePesos, pesos, telefonoLindo, numeroVenta } from "@/lib/formato";
-import { CONCEPTO, ESTADO_CIVIL, cuandoEntrega, detalleCobro, direccionTexto, saldo, situacion } from "@/lib/ventas";
+import { CONCEPTO, cuandoEntrega, detalleCobro, direccionTexto, saldo, situacion } from "@/lib/ventas";
 import type { Cobro, OpcionesVenta, Venta } from "@/lib/tipos";
+import { DatosCliente, fila } from "@/components/DatosCliente";
 import { Icono, type NombreIcono } from "@/components/Icono";
 import { Modal } from "@/components/Modal";
 import { useAviso } from "@/components/Avisos";
@@ -70,7 +71,7 @@ function VerVenta() {
         {v.estado === "pausa" && <div className="alert warn"><Icono n="pause" /><div><b>Venta en pausa.</b> {v.motivo_estado}</div></div>}
         {v.estado === "cancelada" && <div className="alert bad"><Icono n="ban" /><div><b>Venta cancelada el {fecha(v.cancelado_en)}.</b> {v.motivo_estado}</div></div>}
         <div className="o-meta">
-          <div><span>Cliente</span><b>{v.cliente.nombre} {v.cliente.apellido}</b>
+          <div><span>Cliente</span><b><Link href={`/admin/clientes/ver/?id=${v.cliente_id}`} style={{ color: "inherit" }}>{v.cliente.nombre} {v.cliente.apellido}</Link></b>
             {tel && <a className="small" style={{ color: "var(--gold-ink)", fontWeight: 600 }} href={`https://wa.me/${tel}?text=${encodeURIComponent(`Hola ${v.cliente.nombre}, te escribimos de La Unión por tu compra ${numeroVenta(v.numero)}.`)}`} target="_blank" rel="noopener">{telefonoLindo(tel)}</a>}</div>
           <div><span>Entrega prometida</span><b>{fecha(v.fecha_entrega)}</b><span className="small" style={s.texto === "Atrasada" ? { color: "var(--bad)", fontWeight: 700 } : undefined}>
             {v.entregado_en ? `Entregada el ${fecha(v.entregado_en)}` : abierta ? cuandoEntrega(v.fecha_entrega) : ""} · {v.tipo_entrega === "retiro" ? "Retira en el showroom" : "Envío e instalación"}</span></div>
@@ -136,7 +137,7 @@ function VerVenta() {
         alGuardar={(m) => estado({ estado: "pausa", motivo: m }, "Venta en pausa")} />}
       {ventana === "cancelar" && <Motivo titulo={`Cancelar ${numeroVenta(v.numero)}`} etiqueta="Motivo" obligatorio boton="Cancelar la venta" ayuda="Los cobros ya registrados quedan como están. Si hay que devolver plata, anulá el cobro."
         alCerrar={() => setVentana(null)} alGuardar={(m) => estado({ estado: "cancelada", motivo: m }, "Venta cancelada")} />}
-      {ventana && typeof ventana === "object" && <Motivo titulo={`Anular cobro de ${ars(ventana.anular.monto)}`} etiqueta="Motivo" obligatorio boton="Anular el cobro" ayuda="El cobro no se borra: queda tachado, con el motivo, y el saldo vuelve a subir."
+      {ventana && typeof ventana === "object" && <Motivo titulo={`Anular cobro de ${ars(ventana.anular.monto)}`} etiqueta="Motivo" obligatorio boton="Anular el cobro" ayuda="El cobro no se borra: queda tachado, con el motivo, y el saldo vuelve a subir. Si era en efectivo deja de sumar en la caja; si esa caja ya cerró, lo que le devuelvas al cliente cargalo como egreso."
         alCerrar={() => setVentana(null)} alGuardar={async (m) => {
           try { await api("venta/anular-cobro", { body: { cobro_id: ventana.anular.id, motivo: m } }); setVentana(null); avisar("Cobro anulado"); cargar(); }
           catch (e) { avisar((e as Error).message, { tono: "bad", ms: 6000 }); }
@@ -147,37 +148,16 @@ function VerVenta() {
 }
 
 function Ficha({ v, verFoto }: { v: Venta; verFoto: (url: string) => void }) {
-  const c = v.cliente;
-  const fila = (dt: string, dd: ReactNode) => (dd ? <><dt>{dt}</dt><dd>{dd}</dd></> : null);
   return (
     <div className="stack">
-      <section className="card"><div className="card-head"><h2>Cliente</h2></div>
-        <div className="card-body"><dl className="specs">
-          {fila("Nombre", `${c.nombre} ${c.apellido}`)}
-          {fila("DNI", c.dni)}
-          {fila("Estado civil", c.estado_civil && ESTADO_CIVIL[c.estado_civil])}
-          {fila("Nacimiento", c.fecha_nacimiento && fecha(c.fecha_nacimiento))}
-          {fila("Teléfonos", c.telefonos.map((t) => `${telefonoLindo(t.numero_completo)}${t.es_whatsapp ? " (WhatsApp)" : ""}`).join(", "))}
-          {fila("Email", c.email)}
-          {fila("Dirección", c.direccion && `${direccionTexto(c.direccion)}, ${c.direccion.provincia}`)}
-          {fila("Entrega en", v.tipo_entrega === "retiro" ? "Retira en el showroom" : v.direccion_entrega && direccionTexto(v.direccion_entrega))}
-          {fila("Margen de crédito", c.margen_credito && ars(c.margen_credito))}
-        </dl></div>
-      </section>
-      {c.tipo === "negocio" && c.comercio && (
-        <section className="card"><div className="card-head"><h2>Datos comerciales</h2></div>
-          <div className="card-body"><dl className="specs">
-            {fila("Comercio", c.comercio.nombre_comercio)}
-            {fila("Rubro", c.comercio.rubro)}
-            {fila("Domicilio", c.comercio.direccion && `${direccionTexto(c.comercio.direccion)}, ${c.comercio.direccion.provincia}`)}
-          </dl></div>
-        </section>
-      )}
+      <DatosCliente c={v.cliente}>
+        {fila("Entrega en", v.tipo_entrega === "retiro" ? "Retira en el showroom" : v.direccion_entrega && direccionTexto(v.direccion_entrega))}
+      </DatosCliente>
       {v.items.map((x) => (
         <section key={x.id} className="card"><div className="item-card">
           {x.url_foto ? <img className="cover" src={media(x.url_foto)} alt="" /> : <div className="cover" style={{ width: 96, height: 120, borderRadius: 10, background: "var(--surface-2)" }} />}
           <div className="stack-sm" style={{ minWidth: 0 }}>
-            <div><h2>{x.cantidad > 1 && `${x.cantidad}× `}{x.nombre}</h2><span className="small muted">{x.producto_id ? "Del catálogo" : "A medida"}{x.codigo && ` · ${x.codigo}`}</span></div>
+            <div><h2>{x.cantidad > 1 && `${x.cantidad}× `}{x.nombre}</h2><span className="small muted">{x.presupuesto_id ? <Link href={`/admin/presupuestos/editar/?id=${x.presupuesto_id}`}>Ver el presupuesto</Link> : x.producto_id ? "Del catálogo" : "A medida"}{x.codigo && ` · ${x.codigo}`}</span></div>
             <dl className="specs">
               {fila("Descripción", x.descripcion)}
               {fila("Precio", `${ars(x.precio_unitario)}${x.cantidad > 1 ? ` c/u · ${ars(x.cantidad * Number(x.precio_unitario))}` : ""}`)}
@@ -242,6 +222,7 @@ function Cobrar({ v, alGuardar, alCerrar }: { v: Venta; alGuardar: () => void; a
             </select></label>}
           <label className="field"><span>Nº de operación o cupón (opcional)</span><input className="input" value={f.referencia} onChange={(e) => setF({ ...f, referencia: e.target.value })} /></label>
         </div>
+        {tipo === "efectivo" && <p className="small muted">{op?.caja_abierta ? "Entra a la caja abierta." : "La caja está cerrada: entra a la próxima que se abra."}</p>}
         {error && <p className="alert bad" role="alert"><Icono n="alert" /><span>{error}</span></p>}
       </form>
     </Modal>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
-import { ars, fecha, norm, numeroVenta } from "@/lib/formato";
+import { ars, fecha, hoyISO, norm, numeroVenta } from "@/lib/formato";
 import { cuandoEntrega, saldo, situacion } from "@/lib/ventas";
 import type { VentaFila } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
@@ -55,6 +55,15 @@ export default function Ventas() {
 
   if (!puede("ventas.crear")) return <div className="empty card"><h2>Tu usuario no puede ver las ventas</h2></div>;
 
+  // Lo vendido este mes por cada vendedor, sin las canceladas: solo con ventas.reportes (el Administrador)
+  const mes = hoyISO().slice(0, 7);
+  const delMes = new Map<string, { ventas: number; total: number }>();
+  if (puede("ventas.reportes")) for (const v of lista ?? []) {
+    if (v.estado === "cancelada" || !v.vendido_en.startsWith(mes)) continue;
+    const x = delMes.get(v.vendedor) ?? { ventas: 0, total: 0 };
+    delMes.set(v.vendedor, { ventas: x.ventas + 1, total: x.total + Number(v.total) });
+  }
+
   return (
     <>
       <title>Ventas · La Unión</title>
@@ -62,6 +71,18 @@ export default function Ventas() {
         <div><h1>Ventas</h1><p>Cada venta con su cliente, sus muebles, la entrega prometida y lo que falta cobrar.</p></div>
         <Link className="btn btn-primary" href="/admin/ventas/nueva/"><Icono n="plus" />Nueva venta</Link>
       </div>
+
+      {delMes.size > 0 && (
+        <section className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h2>Ventas de {new Intl.DateTimeFormat("es-AR", { month: "long" }).format(new Date(mes + "-01T00:00"))} por vendedor</h2>
+            <span className="small muted">Sin las canceladas · <b className="tnum">{ars([...delMes.values()].reduce((s, x) => s + x.total, 0))}</b></span></div>
+          <div className="table-wrap"><table className="table">
+            <tbody>{[...delMes].sort((a, b) => b[1].total - a[1].total).map(([vendedor, x]) => (
+              <tr key={vendedor}><td>{vendedor}</td><td className="muted">{x.ventas} {x.ventas === 1 ? "venta" : "ventas"}</td><td className="num"><b>{ars(x.total)}</b></td></tr>
+            ))}</tbody>
+          </table></div>
+        </section>
+      )}
 
       <div className="stack-sm" style={{ marginBottom: 14 }}>
         <label className="gsearch" style={{ width: "100%", maxWidth: 520 }}><Icono n="search" /><span className="sr">Buscar ventas</span>

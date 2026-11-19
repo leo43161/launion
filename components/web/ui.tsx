@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { media } from "@/lib/api";
 import { num, parseArs } from "@/lib/formato";
+import type { ColorWeb } from "@/lib/tipos";
 import { etiquetas, lineaMedidas, mensajeDe, precioTexto, type Modelo } from "@/lib/web";
 
 /* ---------- íconos y logo ---------- */
@@ -82,13 +83,15 @@ export const LISTA = "grid grid-cols-[minmax(0,1fr)] gap-3 [&>*]:min-w-0";
 export const TICKS = "grid gap-2 text-[15px] [&_li]:flex [&_li]:gap-2.5 [&_li]:items-start [&_svg]:size-[17px] [&_svg]:text-gold [&_svg]:flex-none [&_svg]:mt-[3px]";
 export const FLECHA = <svg width="14" height="14" aria-hidden="true"><use href="#i-arrow" /></svg>;
 
-/* ---------- acciones de la página (navegar, abrir un modelo, armar el WhatsApp) ---------- */
+/* ---------- acciones de la página (navegar, abrir un modelo o un color, armar el WhatsApp) ---------- */
 
 export type Acciones = {
   wa: (texto: string) => string;
   abrir: (p: Modelo) => void;
+  abrirColor: (c: ColorWeb) => void;
   irAmbiente: (slug: string, tipo?: string) => void;
   irInicio: (ancla?: string) => void;
+  irColores: () => void;
 };
 export const AccionesCtx = createContext<Acciones | null>(null);
 export const useAcciones = (): Acciones => useContext(AccionesCtx)!;
@@ -166,6 +169,24 @@ export function Tarjeta({ p, modo }: { p: Modelo; modo: ModoTarjeta }) {
         <a className={`${BTN_ORO_SM} w-full mt-1.5`} target="_blank" rel="noopener" href={wa(mensajeDe(p))}>Consultar</a>
       </div>
     </article>
+  );
+}
+
+/* ---------- muestra de un color ---------- */
+
+/** La muestra de un color: al tocarla se abre su detalle. En una fila que se desliza, className le da el ancho. */
+export function Muestra({ c, className = "" }: { c: ColorWeb; className?: string }) {
+  const { abrirColor } = useAcciones();
+  return (
+    <button onClick={() => abrirColor(c)} aria-label={`${c.nombre}${c.linea ? `, línea ${c.linea}` : ""}`}
+      className={`group cursor-pointer grid gap-1.5 content-start text-left min-w-0 focus-visible:outline-offset-[3px] focus-visible:rounded-[10px] ${className}`}>
+      <div className={`${MEDIA} aspect-square rounded-xl shadow-[inset_0_0_0_1px_var(--line)]`}>
+        <MarcaFondo />
+        {c.muestra && <Foto src={c.muestra} alt="" className="relative w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.06]" />}
+        {c.fotos.length > 0 && <span className={`${CONTADOR} bottom-[7px] right-[7px]`} aria-hidden="true"><I n="photos" />{c.fotos.length}</span>}
+      </div>
+      <span className="text-[14px] font-semibold leading-[1.25] px-0.5">{c.nombre}{c.textura && <small className="block font-medium text-muted text-[12.5px]">{c.textura}</small>}</span>
+    </button>
   );
 }
 

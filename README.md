@@ -1,7 +1,7 @@
 # La Unión · web y panel nuevos (Next.js + API PHP)
 
 - `app/`, `components/`, `lib/`: la web y el panel, en Next.js con TypeScript, exportados en estático (`npm run build` revisa los tipos y deja todo en `out/`).
-  - `app/(web)/` y `components/web/`: la **web pública**, con el mismo diseño de `muebleria/index.html` pasado a Tailwind (colores y temas en `app/(web)/web.css`). Lee el catálogo de la API (ruta `web`, sin token).
+  - `app/(web)/` y `components/web/`: la **web pública**, con el mismo diseño de `../prototipo/muebleria/index.html` pasado a Tailwind (colores y temas en `app/(web)/web.css`). Lee el catálogo de la API (ruta `web`, sin token).
     - Link de vendedor: `/valentina` pone su WhatsApp en todos los botones.
     - Link de catálogo: `/?catalogo=dormitorio&tipo=placares` (o `/martin?catalogo=kiosco`, con vendedor) muestra solo esos modelos, sin banners ni otros ambientes. Lo arma el botón "Compartir por WhatsApp" del listado.
   - `app/admin/`: el **panel**, con su propio CSS (`app/admin.css`, sin Tailwind).
@@ -9,7 +9,9 @@
 - `api/`: la API en PHP 7.4, con login por JWT. Lee y escribe la base `a0101073_launion`.
 - Por ahora: la web pública, y en el panel:
   - ingreso;
-  - **Ventas**: el formulario de 5 pasos de la ficha en papel (vendedor y cliente, datos comerciales, muebles, entrega y plan de pago, revisar), la lista, la ficha de cada venta con sus cobros e historial, y la hoja A4 para que el cliente firme. Pide `db/arreglo-ventas.sql`;
+  - **Ventas**: el formulario de 5 pasos de la ficha en papel (vendedor y cliente, datos comerciales, muebles, entrega y plan de pago, revisar), la lista, la ficha de cada venta con sus cobros e historial, y la hoja A4 para que el cliente firme. Cada mueble sale de un presupuesto: uno ya hecho o uno nuevo, armado desde la venta. Arriba, el administrador ve lo vendido en el mes por cada vendedor. Pide `db/arreglo-ventas.sql` y `db/arreglo-presupuestos-ventas.sql`;
+  - **Clientes** (CRM): la agenda con lo que compró cada cliente y lo que debe, "Para esta semana" (recordatorios y entregas, con lo que falta cobrar) y la ficha de cada uno con sus compras, sus notas y recordatorios, para editar sus datos y para cargarle otra venta. Pide `db/arreglo-crm.sql`;
+  - **Caja**: el efectivo del showroom. Se abre con el efectivo inicial, los cobros en efectivo de las ventas entran solos, los egresos y otros ingresos se cargan a mano, y se cierra contando (si no cuadra, se anota por qué). Historial por mes. La usan el vendedor y el administrador. Pide `db/arreglo-caja.sql`;
   - **Configuración**: solo el administrador. Cuentas bancarias, posnets con sus recargos y localidades, que usa el formulario de venta;
   - **Catálogo**: alta, edición, fotos, video, precios, ocultar, eliminar y restaurar;
   - **Vendedores**;
@@ -18,16 +20,19 @@
 
 ## Probar en la compu
 
-Hace falta MySQL con la base cargada (`db/base-de-datos.sql` + `db/datos-iniciales.sql`), PHP con pdo_mysql (sirve el de XAMPP) y unos 500 MB libres para `npm install`.
+Hace falta Docker Desktop prendido, PHP (el de XAMPP en `C:\xampp`, o `php` en el PATH), `npm install` hecho, y en `../db/` `base-de-datos.sql`, `prueba-completa.sql` y un export de phpMyAdmin (`a0101073_launion.sql`).
 
-1. Copiá `api/config.example.php` como `api/config.php`:
-   - Completá los datos de la base local.
-   - Generá el secreto con `php -r "echo bin2hex(random_bytes(32));"`.
-   - Poné `'cors_origen' => 'http://localhost:3000'`.
-2. Levantá la API: `php -S localhost:8000 -t api`
-3. Copiá `.env.example` como `.env.local`. Después corré `npm install` y `npm run dev`, y abrí http://localhost:3000/ (la web) o http://localhost:3000/admin/ (el panel)
-
-Para entrar se usa el usuario `admin`, con la misma contraseña de `/administracion`.
+- `npm run local` levanta todo (`scripts/local.mjs`):
+  1. La base: una copia de la real en Docker (contenedor `lu_mysql_local`, puerto 3307). La primera vez la arma con el export y corre la prueba.
+  2. La API en localhost:8000. El panel la llama en `/api/index.php` y `next dev` se la pasa (`next.config.ts`).
+  3. La web y el panel en http://localhost:5057/ y http://localhost:5057/admin/. Se entra con los mismos usuarios y contraseñas que en la web real.
+  4. Desde otra compu de la misma red: `http://<IP de esta compu>:5057/admin/` (el script la muestra al arrancar). La primera vez, Windows pregunta si deja pasar a Node por el firewall: aceptá para redes privadas.
+- `npm run local:base` borra la copia y la vuelve a armar: primero bajá un export nuevo de phpMyAdmin a `db/a0101073_launion.sql`.
+- Lo que se carga en la compu no toca la base real. Las fotos se leen de la web real.
+- En la copia hay dos vendedores de prueba para asignarles ventas: usuarios `vendedor1` y `vendedor2`, contraseña `prueba1234` (entran con el rol Vendedor). Y 5 clientes que ya compraron, con 8 ventas anteriores (`scripts/clientes-prueba.sql`: se buscan por DNI 991000…). Solo existen en la compu: si los borrás, vuelven en el próximo `npm run local`.
+- Para mirar la base: cualquier programa de MySQL (HeidiSQL, Workbench, DBeaver) en `127.0.0.1`, puerto `3307`, usuario `root` y la clave `db_clave` de `api/config.php`. O desde la consola: `& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -h127.0.0.1 -P3307 -uroot -p a0101073_launion` (pide esa clave).
+- Si faltan `api/config.php` o `.env.local`, el script los arma.
+- Ctrl+C corta la API y el panel. La base queda prendida: es liviana y arranca sola con Docker.
 
 ## Subir a Ferozo
 
@@ -87,3 +92,17 @@ Para volver a pasar la planilla de Excel de presupuestos (genera el .sql y deja 
 ```
 C:\xampp\php\php.exe api\herramientas\migrar-excel.php "..\doc-presupuesto\LISTA COMODAS (1) (1).xlsx" ..\db\presupuestos-excel.sql <carpeta>\presupuestos
 ```
+
+### Colores
+
+La vista Colores de la web (launionmuebles.com.ar/colores, o con vendedor `/pilar?catalogo=colores`) muestra la tabla `colores`, separados por proveedor y línea. Para ponerla en marcha, **antes** del push:
+1. En phpMyAdmin, base `a0101073_launion`: `db/arreglo-colores.sql` (una sola vez) y después `db/colores-faplac.sql` (67 colores de Faplac).
+2. Subí `fotos-colores.zip` (en `MUEBLERIA/`) a `public_html/launion/assets/` y descomprimilo ahí: crea `assets/colores/faplac/` (7 MB). Después borrá el .zip.
+
+Para ocultar un color, hasta que haya pantalla en el panel: `UPDATE colores SET visible = 0 WHERE nombre = 'Cajú';`.
+
+Para traer los diseños nuevos de Faplac (vuelve a bajar todo de faplaconline.com.ar: agrega los nuevos y actualiza los demás, sin cambiarles `visible` ni `activo`):
+```
+C:\xampp\php\php.exe api\herramientas\colores-faplac.php ..\db\colores-faplac.sql <carpeta>\colores\faplac
+```
+Después se importa `db/colores-faplac.sql` y se zipea la carpeta `colores` (con `tar -a -cf fotos-colores.zip colores`: el zip de Windows guarda las rutas con `\` y en el servidor quedan mal).

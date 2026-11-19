@@ -13,7 +13,12 @@ const ESTADOS_CIVILES = ['soltero', 'casado', 'union_convivencial', 'divorciado'
 function ventas_listar() {
   exigir('ventas.crear');
   // ponytail: trae todas y la pantalla filtra; paginar cuando pasen de unos miles
-  salir(['ventas' => consulta("SELECT v.id, v.numero, v.vendido_en, v.fecha_entrega, v.tipo_entrega, v.estado, v.total, v.entregado_en, v.vendedor_id,
+  salir(['ventas' => ventas_filas()]);
+}
+
+/** Las filas de la lista de ventas (VentaFila en lib/tipos.ts). $donde filtra, sobre la venta v: también las usan la ficha del cliente y la agenda. */
+function ventas_filas($donde = '1', $params = []) {
+  return consulta("SELECT v.id, v.numero, v.vendido_en, v.fecha_entrega, v.tipo_entrega, v.estado, v.total, v.entregado_en, v.vendedor_id, v.cliente_id,
       TRIM(CONCAT_WS(' ', pe.nombre, pe.apellido)) AS cliente, pe.dni,
       (SELECT t.numero_completo FROM telefonos t WHERE t.persona_id = pe.id ORDER BY t.es_principal DESC, t.id LIMIT 1) AS telefono,
       (SELECT l.nombre FROM direcciones d JOIN localidades l ON l.id = d.localidad_id
@@ -24,7 +29,7 @@ function ventas_listar() {
       " . PAGADO_SQL . ' AS pagado, ' . FINANCIADO_SQL . " AS financiado
     FROM ventas v JOIN clientes c ON c.id = v.cliente_id JOIN personas pe ON pe.id = c.persona_id
     JOIN empleados ev ON ev.id = v.vendedor_id JOIN personas pv ON pv.id = ev.persona_id
-    ORDER BY v.numero DESC")->fetchAll()]);
+    WHERE $donde ORDER BY v.numero DESC", $params)->fetchAll();
 }
 
 function direccion_ver($id) {
@@ -56,7 +61,7 @@ function venta_ver() {
   if (!$v) fallar('No existe esa venta.', 404);
   $v['cliente'] = cliente_datos($v['cliente_id']);
   $v['direccion_entrega'] = direccion_ver($v['direccion_entrega_id']);
-  $v['items'] = consulta('SELECT id, producto_id, codigo, nombre, descripcion, cantidad, precio_unitario, notas_taller, url_foto FROM ventas_items WHERE venta_id = ? ORDER BY id', [$id])->fetchAll();
+  $v['items'] = consulta('SELECT id, producto_id, presupuesto_id, codigo, nombre, descripcion, cantidad, precio_unitario, notas_taller, url_foto FROM ventas_items WHERE venta_id = ? ORDER BY id', [$id])->fetchAll();
   $adjuntos = consulta('SELECT a.venta_item_id, a.url FROM ventas_items_adjuntos a JOIN ventas_items i ON i.id = a.venta_item_id WHERE i.venta_id = ? ORDER BY a.id', [$id])->fetchAll();
   foreach ($v['items'] as &$i) $i['adjuntos'] = array_values(array_map(function ($a) { return $a['url']; }, array_filter($adjuntos, function ($a) use ($i) { return $a['venta_item_id'] === $i['id']; })));
   unset($i);
@@ -88,6 +93,7 @@ function venta_opciones() {
     'vendedores' => consulta("SELECT e.id, TRIM(CONCAT_WS(' ', p.nombre, p.apellido)) AS nombre FROM empleados e JOIN personas p ON p.id = e.persona_id
       WHERE e.fecha_egreso IS NULL AND e.lugar_trabajo <> 'fabrica' ORDER BY nombre")->fetchAll(),
     'rubros' => consulta('SELECT DISTINCT rubro FROM clientes_comercios WHERE rubro IS NOT NULL ORDER BY rubro')->fetchAll(PDO::FETCH_COLUMN),
+    'caja_abierta' => (bool)consulta('SELECT 1 FROM caja_sesiones WHERE cerrada_en IS NULL LIMIT 1')->fetchColumn(), // para avisar adónde va el efectivo
   ]);
 }
 
@@ -171,6 +177,7 @@ function cobro_datos($p, $nombre) {
 function cobro_insertar($venta, $concepto, $c, $cobrado_por) {
   consulta('INSERT INTO cobros (venta_id, concepto, cobrado_por, creado_por, ' . implode(', ', array_keys($c)) . ') VALUES (?, ?, ?, ?' . str_repeat(', ?', count($c)) . ')',
     array_merge([$venta, $concepto, $cobrado_por, usuario()['id']], array_values($c)));
+  caja_cobro((int)db()->lastInsertId()); // en efectivo, entra a la caja abierta (caja.php)
 }
 
 function historial($venta, $texto) {
@@ -180,15 +187,9 @@ function plata($n) { return '$ ' . number_format($n, fmod($n, 1) ? 2 : 0, ',', '
 
 /* ---------- guardar ---------- */
 
-/** La venta completa del formulario (ver VentaGuardar en lib/tipos.ts). Todo en una transacción: cliente, venta, muebles, cobros e historial. */
-function venta_guardar() {
-  exigir('ventas.crear');
-  $e = entrada();
-  $c = (array)($e['cliente'] ?? []);
-
-  // Paso 1 · vendedor y cliente
-  $vendedor = (int)($e['vendedor_id'] ?? 0);
-  if (!consulta('SELECT 1 FROM empleados WHERE id = ? AND fecha_egreso IS NULL', [$vendedor])->fetchColumn()) fallar('Elegí el vendedor.');
+/** Los datos del cliente de la ficha (pasos 1 y 2, VentaGuardar["cliente"] en lib/tipos.ts), revisados y listos para cliente_guardar().
+    Los usan la venta y "Editar datos" en la ficha del cliente. */
+function cliente_validar($c) {
   $dni = preg_replace('/[\s.\-]/', '', (string)($c['dni'] ?? ''));
   if (!preg_match('/^[0-9A-Za-z]{6,12}$/', $dni)) fallar('Revisá el DNI: de 6 a 12 números, sin puntos.');
   $estado_civil = (string)($c['estado_civil'] ?? '');
@@ -214,7 +215,7 @@ function venta_guardar() {
   $tipo = ($c['tipo'] ?? '') === 'negocio' ? 'negocio' : 'casa';
   $margen = numero($c, 'margen_credito', 0, 999999999999, 'Margen de crédito');
 
-  // Paso 2 · datos comerciales, solo si compra para un negocio
+  // Datos comerciales, solo si compra para un negocio
   $comercio = null;
   if ($tipo === 'negocio') {
     $m = (array)($c['comercio'] ?? []);
@@ -224,6 +225,19 @@ function venta_guardar() {
       'direccion' => direccion_datos((array)($m['direccion'] ?? []), 'Domicilio comercial', false),
     ];
   }
+  return ['persona' => $persona, 'telefonos' => $telefonos, 'email' => $email, 'direccion' => $direccion, 'tipo' => $tipo, 'margen' => $margen, 'comercio' => $comercio];
+}
+
+/** La venta completa del formulario (ver VentaGuardar en lib/tipos.ts). Todo en una transacción: cliente, venta, muebles, cobros e historial. */
+function venta_guardar() {
+  exigir('ventas.crear');
+  $e = entrada();
+  $c = (array)($e['cliente'] ?? []);
+
+  // Pasos 1 y 2 · vendedor, cliente y datos comerciales
+  $vendedor = (int)($e['vendedor_id'] ?? 0);
+  if (!consulta('SELECT 1 FROM empleados WHERE id = ? AND fecha_egreso IS NULL', [$vendedor])->fetchColumn()) fallar('Elegí el vendedor.');
+  $cliente_datos = cliente_validar($c);
 
   // Paso 3 · muebles
   $items = [];
@@ -232,10 +246,13 @@ function venta_guardar() {
     $n = 'Mueble ' . ($i + 1);
     $producto = (int)($x['producto_id'] ?? 0) ?: null;
     if ($producto && !consulta('SELECT 1 FROM productos WHERE id = ?', [$producto])->fetchColumn()) fallar("$n: ese modelo ya no está en el catálogo.");
+    $presupuesto = (int)($x['presupuesto_id'] ?? 0) ?: null;
+    if ($presupuesto && !consulta('SELECT 1 FROM presupuestos WHERE id = ?', [$presupuesto])->fetchColumn()) fallar("$n: ese presupuesto ya no existe. Quitalo y agregalo de nuevo.");
     $cantidad = numero($x, 'cantidad', 1, 999, "$n, cantidad") ?? fallar("$n: falta la cantidad.");
     if ($cantidad != (int)$cantidad) fallar("$n: la cantidad va sin decimales.");
     $fila = [
       'producto_id' => $producto,
+      'presupuesto_id' => $presupuesto,
       'codigo' => texto($x, 'codigo', 30, "$n, código"),
       'nombre' => texto($x, 'nombre', 160, "$n, nombre") ?? fallar("$n: falta qué se fabrica."),
       'descripcion' => texto($x, 'descripcion', 5000, "$n, descripción") ?? fallar("$n: falta la descripción."),
@@ -287,15 +304,17 @@ function venta_guardar() {
   for ($intento = 1; ; $intento++) {
     try {
       db()->beginTransaction();
-      $cliente = cliente_guardar((int)($c['id'] ?? 0), $persona, $telefonos, $email, $direccion, $tipo, $margen, $comercio);
+      $cliente = cliente_guardar((int)($c['id'] ?? 0), $cliente_datos);
       consulta('INSERT INTO ventas (numero, cliente_id, vendedor_id, creado_por, fecha_entrega, tipo_entrega, direccion_entrega_id, subtotal, descuento, total, notas)
         SELECT IFNULL(MAX(numero), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM ventas',
         [$cliente['id'], $vendedor, usuario()['id'], $fecha_entrega, $tipo_entrega, $tipo_entrega === 'envio' ? $cliente['direccion_id'] : null, $subtotal, $descuento, $total, $notas]);
       $venta = (int)db()->lastInsertId();
       foreach ($items as $x) {
         $f = $x['fila'];
-        consulta('INSERT INTO ventas_items (venta_id, ' . implode(', ', array_keys($f)) . ', url_foto) VALUES (?' . str_repeat(', ?', count($f)) . ',
-          (SELECT pf.url FROM productos_fotos pf WHERE pf.producto_id = ? ORDER BY pf.orden LIMIT 1))', array_merge([$venta], array_values($f), [$f['producto_id']]));
+        // La foto del presupuesto o, si no tiene, la del modelo del catálogo
+        consulta('INSERT INTO ventas_items (venta_id, ' . implode(', ', array_keys($f)) . ', url_foto) VALUES (?' . str_repeat(', ?', count($f)) . ",
+          COALESCE((SELECT NULLIF(p.url_foto, '') FROM presupuestos p WHERE p.id = ?), (SELECT pf.url FROM productos_fotos pf WHERE pf.producto_id = ? ORDER BY pf.orden LIMIT 1)))",
+          array_merge([$venta], array_values($f), [$f['presupuesto_id'], $f['producto_id']]));
         $item = (int)db()->lastInsertId();
         foreach ($x['adjuntos'] as $url) consulta('INSERT INTO ventas_items_adjuntos (venta_item_id, url, subido_por) VALUES (?, ?, ?)', [$item, $url, usuario()['id']]);
       }
@@ -312,8 +331,9 @@ function venta_guardar() {
   }
 }
 
-/** Crea o actualiza al cliente con los datos de la ficha. Devuelve [id, direccion_id]. */
-function cliente_guardar($cliente_id, $persona, $telefonos, $email, $direccion, $tipo, $margen, $comercio) {
+/** Crea o actualiza al cliente con los datos de cliente_validar(). Devuelve [id, direccion_id]. Va dentro de una transacción. */
+function cliente_guardar($cliente_id, $d) {
+  ['persona' => $persona, 'telefonos' => $telefonos, 'email' => $email, 'direccion' => $direccion, 'tipo' => $tipo, 'margen' => $margen, 'comercio' => $comercio] = $d;
   // La persona: la del cliente elegido; si no, la que ya tenga ese DNI (puede ser un empleado); si no, una nueva
   $con_dni = consulta('SELECT id FROM personas WHERE dni = ?', [$persona['dni']])->fetchColumn();
   $persona_id = $cliente_id ? consulta('SELECT persona_id FROM clientes WHERE id = ?', [$cliente_id])->fetchColumn() : $con_dni;

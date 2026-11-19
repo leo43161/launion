@@ -26,7 +26,7 @@ export function direccionTexto(d: Omit<Direccion, "id" | "localidad_id" | "provi
   return [[`${d.calle} ${d.numero ?? ""}`.trim(), piso].filter(Boolean).join(", "), d.barrio, d.localidad].filter(Boolean).join(" · ");
 }
 
-export const saldo = (v: { total: Monto; pagado: Monto }): number => Math.round((Number(v.total) - Number(v.pagado)) * 100) / 100;
+export const saldo = (v: { total: Monto | number; pagado: Monto | number }): number => Math.round((Number(v.total) - Number(v.pagado)) * 100) / 100;
 
 /** Cómo está la venta: cancelada y en pausa salen del estado; entregada, de la marca; atrasada, de la fecha prometida. */
 export function situacion(v: { estado: EstadoVenta; entregado_en: string | null; fecha_entrega: string }): { texto: string; tono: "ok" | "bad" | "warn" | "info" } {
@@ -37,9 +37,12 @@ export function situacion(v: { estado: EstadoVenta; entregado_en: string | null;
   return { texto: "En curso", tono: "info" };
 }
 
+/** Días desde hoy hasta la fecha ("2026-11-16"): 0 hoy, 1 mañana, negativo si ya pasó. */
+export const diasHasta = (fecha: string): number => Math.round((new Date(fecha.slice(0, 10) + "T00:00").getTime() - new Date(hoyISO() + "T00:00").getTime()) / 864e5);
+
 /** "Faltan 5 días", "Hoy", "Atrasada 3 días" */
 export function cuandoEntrega(fecha: string): string {
-  const dias = Math.round((new Date(fecha + "T00:00").getTime() - new Date(hoyISO() + "T00:00").getTime()) / 864e5);
+  const dias = diasHasta(fecha);
   if (dias === 0) return "Hoy";
   if (dias === 1) return "Mañana";
   return dias > 0 ? `Faltan ${dias} días` : `Atrasada ${-dias} ${dias === -1 ? "día" : "días"}`;

@@ -4,7 +4,7 @@
 
 export type Bit = 0 | 1;
 export type Monto = string;
-export type Permiso = "*" | "catalogo.editar" | "precios.ver" | "usuarios.editar" | "ventas.crear" | "ventas.anular" | "configuracion.editar";
+export type Permiso = "*" | "catalogo.editar" | "precios.ver" | "usuarios.editar" | "ventas.crear" | "ventas.anular" | "ventas.reportes" | "caja.usar" | "caja.anular" | "configuracion.editar";
 
 export interface Usuario {
   id: number;
@@ -137,6 +137,7 @@ export interface PresupuestoFila {
   producto_id: number | null; // modelo del catálogo vinculado
   producto: string | null; // su nombre
   url_foto: string | null;
+  foto: string | null; // url_foto o, si no tiene, la primera del modelo vinculado
   multiplicador: Monto;
   precio_final: Monto | null; // null = el calculado
   costo: Monto;
@@ -170,6 +171,8 @@ export interface Presupuesto {
   multiplicador: Monto;
   precio_final: Monto | null;
   costo: Monto;
+  foto: string | null; // url_foto o, si no tiene, la primera del modelo vinculado
+  codigo: string | null; // el código del modelo vinculado
   creado_en: string;
   actualizado_en: string | null;
   actualizado_por: number | null;
@@ -252,6 +255,7 @@ export interface VentaFila {
   entregado_en: string | null;
   vendedor_id: number;
   vendedor: string;
+  cliente_id: number;
   cliente: string;
   dni: string | null;
   telefono: string | null;
@@ -287,6 +291,82 @@ export interface Cliente {
   comercio: { nombre_comercio: string | null; rubro: string | null; direccion: Direccion | null } | null;
 }
 
+/* ---------- caja (el efectivo del showroom) ---------- */
+
+/** Una caja: de que se abre hasta que se cierra. esperado = inicial + cobros + otros ingresos − egresos (cerrada: el que se guardó al cerrar). */
+export interface CajaSesion {
+  id: number;
+  abierta_en: string;
+  abierta_por: string;
+  cerrada_en: string | null; // null = abierta
+  cerrada_por: string | null;
+  monto_inicial: Monto;
+  cobros: Monto; // cobros en efectivo de las ventas, sin los anulados
+  otros_ingresos: Monto;
+  egresos: Monto;
+  esperado: Monto;
+  monto_contado: Monto | null;
+  motivo_diferencia: string | null;
+}
+
+export interface CajaMovimiento {
+  id: number;
+  tipo: "ingreso" | "egreso";
+  rubro: string;
+  monto: Monto;
+  descripcion: string | null;
+  hora: string; // la del cobro, si es el de una venta
+  creado_por: string;
+  creado_por_id: number; // usuario: puede borrarlo él (o el Administrador), si la caja sigue abierta
+  cobro_id: number | null; // el cobro en efectivo de una venta: entra solo
+  anulado_en: string | null; // el cobro se anuló: no suma
+  venta_id: number | null;
+  venta_numero: number | null;
+  cliente: string | null;
+}
+
+export interface CajaRubro { id: number; nombre: string; tipo: "ingreso" | "egreso" }
+
+/** Un cliente en la agenda (clientes/agenda). Las cuentas no incluyen las ventas canceladas; pagado incluye lo financiado. */
+export interface ClienteAgenda {
+  id: number;
+  nombre: string;
+  dni: string | null;
+  tipo: "casa" | "negocio";
+  comercio: string | null;
+  telefono: string | null; // el principal
+  localidad: string | null;
+  compras: number;
+  comprado: Monto;
+  pagado: Monto;
+  financiado: Monto; // la parte en cuotas del crédito de la casa (ya cuenta en pagado)
+  ultima_compra: string | null;
+  recordatorios: number; // pendientes
+}
+
+/** Nota de la ficha del cliente. Con recordar_el es un recordatorio; hecho_en, cuándo se cumplió. */
+export interface NotaCliente {
+  id: number;
+  texto: string;
+  recordar_el: string | null;
+  hecho_en: string | null;
+  hecho_por: string | null;
+  creado_en: string;
+  creado_por: string;
+  creado_por_id: number; // usuario: puede borrarla él (o el Administrador)
+}
+
+/** Recordatorio pendiente, para "Para esta semana". */
+export interface Recordatorio {
+  id: number;
+  cliente_id: number;
+  cliente: string;
+  telefono: string | null;
+  texto: string;
+  recordar_el: string;
+  creado_por: string;
+}
+
 /** Resultado de la búsqueda por nombre, DNI o teléfono. */
 export interface ClienteFila {
   id: number;
@@ -299,13 +379,14 @@ export interface ClienteFila {
 export interface VentaItem {
   id: number;
   producto_id: number | null; // null = a medida
+  presupuesto_id: number | null; // el presupuesto del que salió
   codigo: string | null;
   nombre: string;
   descripcion: string | null;
   cantidad: number;
   precio_unitario: Monto;
   notas_taller: string | null;
-  url_foto: string | null; // la del catálogo
+  url_foto: string | null; // la del presupuesto o la del catálogo
   adjuntos: string[]; // fotos o croquis del cliente
 }
 
@@ -369,6 +450,7 @@ export interface OpcionesVenta {
   planes: PlanVenta[];
   vendedores: { id: number; nombre: string }[];
   rubros: string[];
+  caja_abierta: boolean; // el efectivo entra a la caja abierta; si no hay, a la próxima que se abra
 }
 
 export interface DireccionGuardar { calle: string; numero: string; piso: string; departamento: string; barrio: string; localidad_id: number | null }
@@ -392,7 +474,7 @@ export interface VentaGuardar {
     tipo: "casa" | "negocio";
     comercio: { nombre_comercio: string; rubro: string; direccion: DireccionGuardar } | null;
   };
-  items: { producto_id: number | null; codigo: string; nombre: string; descripcion: string; cantidad: number | null; precio_unitario: number | null; notas_taller: string; adjuntos: string[] }[];
+  items: { producto_id: number | null; presupuesto_id: number | null; codigo: string; nombre: string; descripcion: string; cantidad: number | null; precio_unitario: number | null; notas_taller: string; adjuntos: string[] }[];
   fecha_entrega: string;
   tipo_entrega: TipoEntrega;
   descuento: number | null;
@@ -499,6 +581,20 @@ export interface TrabajoWeb {
   fotos: string[];
 }
 
+/** Color de un proveedor (Faplac…), para la página Colores. muestra: la foto de la textura; fotos: muebles o ambientes con el color. */
+export interface ColorWeb {
+  id: number;
+  proveedor: string | null;
+  linea: string | null;
+  nombre: string;
+  codigo: string | null;
+  material: string | null; // Melamina, Polímero…
+  textura: string | null;
+  descripcion: string | null;
+  muestra: string | null;
+  fotos: string[];
+}
+
 /** Respuesta de cada ruta. */
 export interface Respuestas {
   "auth/ingresar": { token: string };
@@ -526,11 +622,24 @@ export interface Respuestas {
   "venta/estado": { ok: true };
   clientes: { clientes: ClienteFila[] };
   cliente: { cliente: Cliente; ventas: { id: number; numero: number }[] }; // sus ventas anteriores
+  "clientes/agenda": { clientes: ClienteAgenda[]; recordatorios: Recordatorio[]; entregas: VentaFila[] }; // entregas: las que falta entregar
+  "cliente/ficha": { cliente: Cliente; ventas: VentaFila[]; notas: NotaCliente[] };
+  "cliente/guardar": { ok: true };
+  // sesion: la abierta, la de ?id= o, si no hay abierta, la última. pendientes: cobros en efectivo que entran al abrir la próxima
+  caja: { sesion: CajaSesion | null; movimientos: CajaMovimiento[]; otros_medios: { medio: string; cobros: number; total: Monto }[]; pendientes: { cobros: number; total: Monto }; rubros: CajaRubro[] };
+  "caja/historial": { cajas: CajaSesion[] };
+  "caja/abrir": { id: number };
+  "caja/movimiento": { ok: true };
+  "caja/movimiento/eliminar": { ok: true };
+  "caja/cerrar": { id: number };
+  "cliente/nota": { id: number };
+  "cliente/nota/estado": { ok: true };
+  "cliente/nota/eliminar": { ok: true };
   configuracion: Configuracion;
   "configuracion/cuentas": Configuracion;
   "configuracion/posnets": Configuracion;
   "configuracion/localidades": Configuracion;
-  web: { ambientes: AmbienteWeb[]; modelos: ModeloWeb[]; trabajos: TrabajoWeb[]; vendedores: Record<string, string> }; // vendedores: link → WhatsApp
+  web: { ambientes: AmbienteWeb[]; modelos: ModeloWeb[]; trabajos: TrabajoWeb[]; colores: ColorWeb[]; vendedores: Record<string, string> }; // vendedores: link → WhatsApp
 }
 
 /** Cuerpo de las rutas POST; las que no están acá son GET. La subida de archivos va aparte: subir(). */
@@ -548,6 +657,14 @@ export interface Pedidos {
   "venta/cobro": PagoGuardar & { venta_id: number };
   "venta/anular-cobro": { cobro_id: number; motivo: string };
   "venta/estado": { id: number; estado?: EstadoVenta; motivo?: string; fecha_entrega?: string; entregada?: boolean };
+  "cliente/guardar": VentaGuardar["cliente"]; // con id: los datos del cliente desde su ficha
+  "caja/abrir": { monto_inicial: number | null };
+  "caja/movimiento": { tipo: "ingreso" | "egreso"; caja_rubro_id: number; monto: number | null; descripcion: string };
+  "caja/movimiento/eliminar": { id: number };
+  "caja/cerrar": { monto_contado: number | null; motivo: string };
+  "cliente/nota": { cliente_id: number; texto: string; recordar_el: string }; // recordar_el "" = nota sin recordatorio
+  "cliente/nota/estado": { id: number; hecha: boolean };
+  "cliente/nota/eliminar": { id: number };
   "configuracion/cuentas": { cuentas: CuentaGuardar[] };
   "configuracion/posnets": { posnets: PosnetGuardar[] };
   "configuracion/localidades": { localidades: LocalidadGuardar[] };

@@ -1,6 +1,7 @@
 "use client";
 // Alta y edición de un presupuesto: /admin/presupuestos/editar/?id=<id>. Sin id = nuevo; ?copiar=<id> = nuevo a partir de otro;
-// ?producto=<id> = nuevo, vinculado a ese modelo del catálogo.
+// ?producto=<id> = nuevo, vinculado a ese modelo del catálogo; ?venta=1 = nuevo desde la venta que se está cargando: al guardarlo,
+// vuelve a /admin/ventas/nueva/?presupuesto=<id>, que lo agrega como mueble (el borrador de la venta queda en la pestaña).
 // Como en el Excel: total de un insumo = cantidad × costo unitario, y con porcentual entra solo esa parte (melamina $100.000 al 50 % = $50.000).
 // Costo = suma de esos totales, precio = costo × multiplicador.
 // El precio final se pone a mano (redondeado). El despiece no entra en el costo: da los m² de cada material para calcular la placa.
@@ -13,6 +14,7 @@ import { ars, dec, fechaHora, medidas, norm, parseDec, parsePesos, pesos, precio
 import type { Presupuesto, PresupuestoGuardar, Respuestas } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
 import { Modal } from "@/components/Modal";
+import { SelectConFoto } from "@/components/SelectConFoto";
 import { useAviso } from "@/components/Avisos";
 
 export default function Pagina() {
@@ -62,6 +64,8 @@ function Editar() {
   const id = Number(parametros.get("id")) || null; // null = nuevo
   const copiar = Number(parametros.get("copiar")) || null;
   const producto = parametros.get("producto") ?? "";
+  const venta = !id && parametros.has("venta");
+  const volver = venta ? "/admin/ventas/nueva/" : "/admin/presupuestos/";
   const router = useRouter();
   const avisar = useAviso();
   const { puede } = useSesion();
@@ -97,7 +101,7 @@ function Editar() {
     return () => removeEventListener("beforeunload", avisarSalida);
   }, [cambios]);
 
-  if (error) return <div className="empty card"><h2>{error}</h2><Link className="btn" href="/admin/presupuestos/">Volver a presupuestos</Link></div>;
+  if (error) return <div className="empty card"><h2>{error}</h2><Link className="btn" href={volver}>{venta ? "Volver a la venta" : "Volver a presupuestos"}</Link></div>;
   if (!p || !otros || !catalogo) return <p className="muted">Cargando…</p>;
 
   const cambiar = (cambio: Partial<Formulario>) => { setP((x) => x && { ...x, ...cambio }); setCambios(true); };
@@ -137,6 +141,10 @@ function Editar() {
   // Modelos por ambiente; los eliminados no se ofrecen, salvo el que ya está vinculado
   const ambienteDe = (categoria: number) => catalogo.categorias.find((c) => c.id === categoria)?.padre_id ?? categoria;
   const modelos = catalogo.productos.filter((m) => !m.eliminado || String(m.id) === p.producto_id).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const opcionesModelo = catalogo.categorias.filter((a) => a.padre_id === null).flatMap((a) => modelos.filter((m) => ambienteDe(m.categoria_id) === a.id).map((m) => ({
+    valor: String(m.id), texto: m.nombre, foto: m.foto, grupo: a.nombre,
+    detalle: [m.categoria_id !== a.id && catalogo.categorias.find((c) => c.id === m.categoria_id)?.nombre, medidas(m), m.codigo, m.eliminado && "eliminado"].filter(Boolean).join(" · "),
+  })));
   const modelo = catalogo.productos.find((m) => String(m.id) === p.producto_id);
 
   const hayMalos = malo(multiplicador) || malo(precioFinal) || insumos.some((x) => malo(x.cantidad) || malo(x.costo) || malo(x.porcentaje)) || cortes.some((c) => malo(c.ancho) || malo(c.alto) || malo(c.cantidad));
@@ -173,7 +181,8 @@ function Editar() {
       const r = await api("presupuesto/guardar", { body: cuerpo });
       setCambios(false);
       avisar(id ? "Cambios guardados" : "Presupuesto creado");
-      if (!id) router.replace(`/admin/presupuestos/editar/?id=${r.id}`);
+      if (venta) router.replace(`/admin/ventas/nueva/?presupuesto=${r.id}`);
+      else if (!id) router.replace(`/admin/presupuestos/editar/?id=${r.id}`);
       else api("presupuesto", { query: { id: String(id) } }).then((x) => setGuardado(x.presupuesto));
     } catch (e) {
       avisar((e as Error).message, { tono: "bad", ms: 6000 });
@@ -200,16 +209,17 @@ function Editar() {
   return (
     <>
       <title>{`${titulo} · La Unión`}</title>
-      <div className="crumb"><Link href="/admin/presupuestos/">Presupuestos</Link><Icono n="right" /><span>{titulo}</span></div>
+      <div className="crumb"><Link href={volver}>{venta ? "Nueva venta" : "Presupuestos"}</Link><Icono n="right" /><span>{titulo}</span></div>
       <div className="page-head">
-        <div><h1>{titulo}</h1>{guardado && <p>Última modificación: {fechaHora(guardado.actualizado_en ?? guardado.creado_en)}</p>}</div>
+        <div><h1>{titulo}</h1>{guardado && <p>Última modificación: {fechaHora(guardado.actualizado_en ?? guardado.creado_en)}</p>}
+          {venta && <p>Para la venta que estás cargando: al guardarlo, vuelve a la venta con este mueble.</p>}</div>
         <div className="row">
-          <Link className="btn" href="/admin/presupuestos/">{cambios ? "Cancelar" : "Volver"}</Link>
+          <Link className="btn" href={volver}>{cambios ? "Cancelar" : "Volver"}</Link>
           {id && <>
             <Link className="btn" href={`/admin/presupuestos/editar/?copiar=${id}`} aria-disabled={cambios} onClick={(e) => { if (cambios) { e.preventDefault(); avisar("Guardá los cambios antes de duplicar."); } }}><Icono n="copy" />Duplicar</Link>
             <button className="btn btn-danger" type="button" onClick={() => setEliminar(true)}><Icono n="trash" /><span className="hide-s">Eliminar</span></button>
           </>}
-          <button className="btn btn-primary" type="button" onClick={guardar} disabled={guardando || !!subiendo}><Icono n="check" />{guardando ? "Guardando…" : "Guardar"}</button>
+          <button className="btn btn-primary" type="button" onClick={guardar} disabled={guardando || !!subiendo}><Icono n="check" />{guardando ? "Guardando…" : venta ? "Guardar y agregar a la venta" : "Guardar"}</button>
         </div>
       </div>
 
@@ -222,28 +232,11 @@ function Editar() {
               <datalist id="grupos">{grupos.map((g) => <option key={g} value={g!} />)}</datalist>
               <small>Para ordenar la lista, como las hojas del Excel.</small>
             </label>
-            <label className="field"><span>Modelo del catálogo</span>
-              <select className="select" value={p.producto_id} onChange={(e) => cambiar({ producto_id: e.target.value })}>
-                <option value="">Ninguno</option>
-                {catalogo.categorias.filter((a) => a.padre_id === null).map((a) => (
-                  <optgroup key={a.id} label={a.nombre}>
-                    {modelos.filter((m) => ambienteDe(m.categoria_id) === a.id).map((m) => (
-                      <option key={m.id} value={m.id}>{[m.nombre, medidas(m), m.eliminado ? "eliminado" : ""].filter(Boolean).join(" · ")}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <small>El mueble de la web que se fabrica con este presupuesto. Desde el modelo se ve su costo y su precio final.</small>
-            </label>
-            {modelo && (
-              <div className="row" style={{ flexWrap: "nowrap" }}>
-                {modelo.foto ? <img className="thumb" src={media(modelo.foto)} alt="" /> : <span className="thumb" />}
-                <span className="small grow">
-                  {puede("catalogo.editar") ? <Link href={`/admin/catalogo/editar/?id=${modelo.id}`}>{modelo.nombre}</Link> : <b>{modelo.nombre}</b>}
-                  {modelo.precio_local && <span className="muted"> · Precio del local: {ars(modelo.precio_local)}</span>}
-                </span>
-              </div>
-            )}
+            <div className="field"><span>Modelo del catálogo</span>
+              <SelectConFoto etiqueta="Modelo del catálogo" opciones={opcionesModelo} valor={p.producto_id} alCambiar={(v) => cambiar({ producto_id: v })} buscar="Buscar: cómoda, placard, código…" />
+              <small>El mueble de la web que se fabrica con este presupuesto. Desde el modelo se ve su costo y su precio final.
+                {modelo && <> {puede("catalogo.editar") && <Link href={`/admin/catalogo/editar/?id=${modelo.id}`}>Ver el modelo</Link>}{modelo.precio_local && <> · Precio del local: {ars(modelo.precio_local)}</>}</>}</small>
+            </div>
           </section>
 
           <section className="card card-pad stack">

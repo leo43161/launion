@@ -521,6 +521,43 @@ a.li:hover { background: var(--surface-2); }
 .lineas .input-money input + span { padding-right: 8px; } /* el % va después del número */
 .lineas .tot { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .input-money:has(input[aria-invalid="true"]) { border-color: var(--bad); }
+
+/* Teléfono para WhatsApp: +54 9, código de área y número (components/Telefono.tsx) */
+.tel-wrap { display: grid; gap: 4px; width: 100%; max-width: 280px; min-width: 0; }
+.input-money.tel > span { white-space: nowrap; }
+.input-money.tel input.tel-area { width: calc(4ch + 18px); flex: none; padding: 0 8px; border-right: 1px solid var(--line-2); text-align: center; }
+.input-money.tel input:last-child { padding-left: 10px; }
+
+/* Clientes: "Para esta semana" (recordatorios y entregas) y las notas de la ficha */
+.semana { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.semana > div + div { border-left: 1px solid var(--line); }
+.semana-tit { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 18px 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.semana-tit .n { font-variant-numeric: tabular-nums; background: var(--surface-2); border-radius: 999px; padding: 1px 7px; color: var(--ink); }
+.semana-cuando { flex: none; width: 84px; font-size: 13px; font-weight: 700; padding-top: 1px; }
+@media (max-width: 900px) {
+  .semana { grid-template-columns: minmax(0, 1fr); }
+  .semana > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  .semana-cuando { width: 64px; }
+}
+.nota.hecha .nota-txt { text-decoration: line-through; color: var(--muted); }
+
+/* Select con buscador y miniaturas (components/SelectConFoto.tsx) */
+.combo { position: relative; min-width: 0; }
+.combo-btn { display: flex; align-items: center; gap: 10px; height: auto; min-height: 40px; padding: 4px 10px 4px 6px; text-align: left; cursor: pointer; }
+.combo-btn > .i:last-child { transform: rotate(90deg); color: var(--faint); }
+.combo-btn[aria-expanded="true"] > .i:last-child { transform: rotate(-90deg); }
+.combo .thumb { width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); }
+.combo-txt { display: grid; min-width: 0; line-height: 1.3; }
+.combo-txt b, .combo-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-txt b { font-weight: 600; }
+.combo-txt small { color: var(--muted); font-size: 12.5px; }
+.combo-pop { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-2); }
+.combo-pop ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(360px, 50vh); overflow: auto; }
+.combo-pop li[role="option"] { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.combo-pop li.on { background: var(--surface-2); }
+.combo-pop li[aria-selected="true"] > .i { color: var(--gold); }
+.combo-grupo { padding: 10px 8px 4px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.combo-nada { padding: 12px 8px; color: var(--muted); font-size: 14px; }
 /* Configuración: planes de los posnets y localidades */
 .lineas.planes .ln { grid-template-columns: 112px minmax(0, 1fr) 72px 96px 84px 38px; grid-template-areas: "t m c r a x"; }
 .lineas.localidades .ln { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 88px 100px 38px; grid-template-areas: "n p a c x"; }

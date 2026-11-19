@@ -6,13 +6,14 @@ import { useSesion } from "@/lib/sesion";
 import { norm, normTelefono, telefonoLindo } from "@/lib/formato";
 import type { Vendedor } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
+import { Telefono } from "@/components/Telefono";
 import { useAviso } from "@/components/Avisos";
 
 interface Fila {
   id?: number; // sin id = vendedor nuevo
   nombre: string;
   link_web: string;
-  telefono: string; // como se escribe: "381 319-6842"
+  telefono: string; // como lo muestra components/Telefono: "381 319-6842"
   clave: string; // para React: el id, o uno provisorio hasta guardar
 }
 
@@ -61,12 +62,10 @@ export default function Vendedores() {
         {lista.map((f, i) => (
           <div key={f.clave} className="stack-sm" style={{ paddingBottom: 14, borderBottom: "1px solid var(--line-2)" }}>
             <div className="grid-3" style={{ alignItems: "end" }}>
-              <label className="field"><span>Nombre</span><input className="input" value={f.nombre} required onChange={(e) => cambiar(i, { nombre: e.target.value })} /></label>
-              <label className="field"><span>Link</span><input className="input" value={f.link_web} required placeholder="pilar" autoComplete="off"
+              <label className="field"><span>Nombre *</span><input className="input" value={f.nombre} required onChange={(e) => cambiar(i, { nombre: e.target.value })} /></label>
+              <label className="field"><span>Link *</span><input className="input" value={f.link_web} required placeholder="pilar" autoComplete="off"
                 onChange={(e) => cambiar(i, { link_web: norm(e.target.value).replace(/[^a-z0-9-]/g, "") })} /></label>
-              <label className="field"><span>WhatsApp</span><input className="input" value={f.telefono} required inputMode="tel" placeholder="381 319-6842" autoComplete="off"
-                onChange={(e) => cambiar(i, { telefono: e.target.value })}
-                onBlur={(e) => { const t = normTelefono(e.target.value); if (/^549\d{10}$/.test(t)) cambiar(i, { telefono: telefonoLindo(t) }); }} /></label>
+              <div className="field"><span>WhatsApp *</span><Telefono valor={f.telefono} etiqueta="WhatsApp" required alCambiar={(v) => cambiar(i, { telefono: v })} /></div>
             </div>
             <div className="spread">
               {f.link_web ? <a className="small" href={web + f.link_web} target="_blank" rel="noopener"><Icono n="link" /> {web + f.link_web}</a> : <span />}

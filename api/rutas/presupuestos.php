@@ -3,14 +3,17 @@
    Total de un insumo = cantidad × costo unitario × porcentual (vacío = 100 %: melamina $100.000 al 50 % = $50.000).
    Costo = suma de los totales. Precio = costo × multiplicador (2,2 en el Excel).
    El precio final se redondea a mano. Los ve y los edita cualquier usuario del panel.
-   Se pueden vincular a un modelo del catálogo (producto_id): el modelo muestra sus presupuestos (producto_ver). */
+   Se pueden vincular a un modelo del catálogo (producto_id): el modelo muestra sus presupuestos (producto_ver).
+   Cada mueble que se vende sale de un presupuesto (ventas_items.presupuesto_id): de ahí toma el nombre, la foto y el precio. */
 
 const COSTO_SQL = '(SELECT ROUND(COALESCE(SUM(i.cantidad * i.costo_unitario * COALESCE(i.porcentaje, 100) / 100), 0), 2) FROM presupuestos_insumos i WHERE i.presupuesto_id = p.id)';
+// La foto del presupuesto o, si no tiene, la primera del modelo vinculado: la que lleva el mueble al venderlo
+const FOTO_SQL = "COALESCE(NULLIF(p.url_foto, ''), (SELECT pf.url FROM productos_fotos pf WHERE pf.producto_id = p.producto_id ORDER BY pf.orden LIMIT 1))";
 
 function presupuestos_listar() {
   usuario();
   salir([
-    'presupuestos' => consulta('SELECT p.id, p.nombre, p.grupo, p.producto_id, pr.nombre AS producto, p.url_foto, p.multiplicador, p.precio_final, ' . COSTO_SQL . ' AS costo,
+    'presupuestos' => consulta('SELECT p.id, p.nombre, p.grupo, p.producto_id, pr.nombre AS producto, p.url_foto, ' . FOTO_SQL . ' AS foto, p.multiplicador, p.precio_final, ' . COSTO_SQL . ' AS costo,
         COALESCE(p.actualizado_en, p.creado_en) AS actualizado_en
       FROM presupuestos p LEFT JOIN productos pr ON pr.id = p.producto_id ORDER BY p.grupo IS NULL, p.grupo, p.id')->fetchAll(), // en cada grupo, en el orden en que se cargaron (el del Excel)
     // El último costo de cada insumo: el editor lo completa al elegir el nombre
@@ -24,7 +27,8 @@ function presupuestos_listar() {
 function presupuesto_ver() {
   usuario();
   $id = (int)($_GET['id'] ?? 0);
-  $p = consulta('SELECT p.*, ' . COSTO_SQL . ' AS costo FROM presupuestos p WHERE p.id = ?', [$id])->fetch();
+  $p = consulta('SELECT p.*, ' . COSTO_SQL . ' AS costo, ' . FOTO_SQL . ' AS foto, (SELECT pr.codigo FROM productos pr WHERE pr.id = p.producto_id) AS codigo
+    FROM presupuestos p WHERE p.id = ?', [$id])->fetch();
   if (!$p) fallar('No existe ese presupuesto.', 404);
   $p['cortes'] = consulta('SELECT pieza, ancho_cm, alto_cm, cantidad, material FROM presupuestos_cortes WHERE presupuesto_id = ? ORDER BY orden, id', [$id])->fetchAll();
   $p['insumos'] = consulta('SELECT insumo, cantidad, costo_unitario, porcentaje FROM presupuestos_insumos WHERE presupuesto_id = ? ORDER BY orden, id', [$id])->fetchAll();

@@ -33,16 +33,32 @@ export function mensajeWhatsapp(p: Medidas & { nombre: string; detalle_medidas: 
   return `Hola! Vi el ${p.nombre}${extra ? ` (${extra})` : ""} en la web y quiero consultar precio y financiación.`;
 }
 
-/** "5493813196842" → "381 319-6842" */
+// Teléfonos de Argentina: código de área + número = 10 cifras. El 11 tiene 2; los de AREA_3, 3, y el resto, 4
+// (AREA_4: los de 4 que empiezan como uno de 3, como Termas 3858 o Orán 3878).
+// ponytail: alcanza para partir el número al mostrarlo; si uno de otra provincia se parte mal, solo cambia cómo se ve: las cifras (y WhatsApp) quedan iguales
+const AREA_3 = "220 221 223 230 236 237 249 260 261 263 264 266 280 291 294 297 299 336 341 342 343 345 348 351 353 358 362 364 370 376 379 380 381 383 385 387 388".split(" ");
+const AREA_4 = "2202 2302 2646 2647 2648 2940 2942 2945 2946 2948 2972 3435 3436 3437 3438 3454 3455 3456 3458 3487 3489 3532 3533 3537 3582 3583 3584 3585 3832 3835 3837 3838 3854 3855 3856 3857 3858 3876 3877 3878 3885 3886 3887 3888".split(" ");
+/** Cuántas de las 10 cifras son del código de área: "3813196842" → 3, "3865123456" → 4, "1155551234" → 2. */
+export const largoArea = (d: string): number => (d.startsWith("11") ? 2 : AREA_3.includes(d.slice(0, 3)) && !AREA_4.includes(d.slice(0, 4)) ? 3 : 4);
+/** El número sin el código de área, con guión antes de las últimas 4 cifras: "3196842" → "319-6842".
+ *  `largo`: las cifras que va a tener, para poner el guión en su lugar mientras se escribe ("3196" → "319-6"). */
+export const numeroLocal = (d: string, largo = d.length): string => (largo > 4 && d.length > largo - 4 ? `${d.slice(0, largo - 4)}-${d.slice(largo - 4)}` : d);
+
+/** "5493813196842" → "381 319-6842", "5493865123456" → "3865 12-3456" */
 export const telefonoLindo = (p: string | null): string => {
   const d = String(p || "").replace(/\D/g, "");
-  if (d.length === 13 && d.startsWith("549")) return `${d.slice(3, 6)} ${d.slice(6, 9)}-${d.slice(9)}`;
-  return d;
+  if (d.length !== 13 || !d.startsWith("549")) return d;
+  const area = largoArea(d.slice(3));
+  return `${d.slice(3, 3 + area)} ${numeroLocal(d.slice(3 + area))}`;
 };
-/** A formato WhatsApp: 549 + código de área + número, sin 0 ni 15. */
+/** A formato WhatsApp: 549 + código de área + número, sin 0 ni 15: "0381 15 319-6842" → "5493813196842". */
 export const normTelefono = (p: string): string => {
   let d = p.replace(/\D/g, "");
   if (d.startsWith("0")) d = d.slice(1);
+  if (d.length === 12 && /^[123]/.test(d)) { // 12 cifras que no empiezan con 54: el 15 de los celulares, después del código de área
+    const area = largoArea(d);
+    if (d.slice(area, area + 2) === "15") d = d.slice(0, area) + d.slice(area + 2);
+  }
   if (d.length === 10) d = "549" + d;
   if (d.length === 12 && d.startsWith("54") && !d.startsWith("549")) d = "549" + d.slice(2);
   return d;

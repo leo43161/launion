@@ -1,16 +1,16 @@
 "use client";
-// La web pública: inicio, listado (por ambiente, para casa o negocio, o búsqueda) y el detalle de cada modelo.
+// La web pública: inicio, listado (por ambiente, para casa o negocio, o búsqueda), colores y el detalle de cada modelo o color.
 // El mismo diseño de muebleria/index.html, aprobado por el cliente, con Tailwind. Los datos salen de la API (ruta "web").
 import { useEffect, useMemo, useRef, useState, type FormEvent, type Ref } from "react";
 import { flushSync } from "react-dom";
-import { DetalleModelo, DetalleTrabajo } from "@/components/web/Detalle";
+import { DetalleColor, DetalleModelo, DetalleTrabajo } from "@/components/web/Detalle";
 import {
   AccionesCtx, BTN_CERRAR, BTN_ICONO, BTN_ORO, BTN_ORO_SM, BTN_SM, Banner, Cabeza, Calculadora, EYEBROW, EYEBROW_CLARO, FILA_PRINCIPAL,
-  FLECHA, Foto, I, LINK, LISTA, MEDIA, Marca, MarcaFondo, Sprite, TICKS, Tarjeta, CONTADOR, type Acciones, type NombreIcono,
+  FLECHA, Foto, I, LINK, LISTA, MEDIA, Marca, MarcaFondo, Muestra, Sprite, TICKS, Tarjeta, CONTADOR, type Acciones, type NombreIcono,
 } from "@/components/web/ui";
 import { api } from "@/lib/api";
 import { norm, normTelefono, telefonoLindo } from "@/lib/formato";
-import type { TrabajoWeb } from "@/lib/tipos";
+import type { ColorWeb, TrabajoWeb } from "@/lib/tipos";
 import { FOTOS, GRUPOS_TRABAJO, PUBLICOS, TELEFONO, anchoDe, armarCatalogo, esLed, grupoDe, type Catalogo, type Modelo, type Publico } from "@/lib/web";
 
 // Link de vendedor (…/pilar, …/juan): todos los WhatsApp de la página van a su número. Se lee apenas carga la página.
@@ -20,14 +20,16 @@ const VENDEDOR = typeof location === "undefined" ? "" : (location.pathname.split
 // con solo esos modelos, sin banners, "Combina bien" ni "Seguí mirando". Lo arma el botón "Compartir por WhatsApp".
 const PEDIDO = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
 const CATALOGO = (PEDIDO.get("catalogo") || "").toLowerCase();
-const slug = (t: string): string => norm(t).trim().replace(/\s+/g, "-"); // "Mesas de luz" → "mesas-de-luz"
+// Colores: …/colores (Apache la manda acá como si fuera un link de vendedor) o, con vendedor, …/pilar?catalogo=colores
+const COLORES = VENDEDOR === "colores" || CATALOGO === "colores";
+const slug =(t: string): string => norm(t).trim().replace(/\s+/g, "-"); // "Mesas de luz" → "mesas-de-luz"
 
 const TEMAS = [["claro", "Claro"], ["gris", "Gris"], ["oscuro", "Oscuro"]] as const;
 type Tema = (typeof TEMAS)[number][0];
 type Medida = "all" | "s" | "m" | "l";
 type Orden = "rec" | "wa" | "wd";
-type Estado = { vista: "inicio" | "resultados"; publico: Publico | null; ambiente: string | null; tipo: string | null; medida: Medida; orden: Orden; q: string; solo: boolean };
-type Hoja = { modelo: Modelo } | { trabajo: TrabajoWeb } | null;
+type Estado = { vista: "inicio" | "resultados" | "colores"; publico: Publico | null; ambiente: string | null; tipo: string | null; medida: Medida; orden: Orden; q: string; solo: boolean };
+type Hoja = { modelo: Modelo } | { trabajo: TrabajoWeb } | { color: ColorWeb } | null;
 
 const MEDIDAS: [Medida, string][] = [["all", "Cualquier medida"], ["s", "Chico · hasta 80 cm"], ["m", "Mediano · 81 a 150 cm"], ["l", "Grande · más de 150 cm"]];
 const BANNERS = [
@@ -177,19 +179,31 @@ function Cuadro({ titulo, items, link, alLink, irAmbiente, soloCompu }: {
 }
 
 /** Ambientes con foto, para la columna de la compu y el menú del celular. */
-function Lateral({ cat, e, enCajon, hecho, irAmbiente, irPublico, irInicio }: {
+function Lateral({ cat, e, enCajon, hecho, irAmbiente, irPublico, irInicio, irColores }: {
   cat: Catalogo | null; e: Estado; enCajon?: boolean; hecho?: () => void;
-  irAmbiente: (slug: string) => void; irPublico: (p: Publico) => void; irInicio: (ancla?: string) => void;
+  irAmbiente: (slug: string) => void; irPublico: (p: Publico) => void; irInicio: (ancla?: string) => void; irColores: () => void;
 }) {
   const fondo = enCajon ? "hover:bg-surface-2 aria-[current=true]:bg-surface-2" : "hover:bg-surface aria-[current=true]:bg-surface";
+  const BTN_LATERAL = `cursor-pointer flex items-center gap-3 py-1.5 px-2 rounded-xl w-full text-ink text-left focus-visible:outline-2 aria-[current=true]:shadow-[inset_0_0_0_1.5px_var(--gold)] ${fondo}`;
   return (
     <>
+      {!!cat?.colores.length && (
+        <div className="grid gap-0.5 mb-[22px]">
+          <h4 className={H4}>Colores</h4>
+          <button aria-current={e.vista === "colores"} onClick={() => { hecho?.(); irColores(); }} className={BTN_LATERAL}>
+            <span className="size-[46px] rounded-[10px] overflow-hidden bg-surface-2 flex-none grid grid-cols-2">
+              {cat.proveedores.flatMap((p) => p.lineas.map((l) => l.colores[0])).slice(0, 4).map((c) => c.muestra && <Foto key={c.id} src={c.muestra} alt="" className="w-full h-full object-cover" />)}
+            </span>
+            <span className="text-[15px] font-semibold leading-[1.25]">Colores y texturas<small className="block font-medium text-[12.5px] text-muted">{cat.colores.length} colores · {cat.proveedores.map((p) => p.nombre).join(", ")}</small></span>
+          </button>
+        </div>
+      )}
       {(["casa", "negocio"] as const).map((pub) => (
         <div key={pub} className="grid gap-0.5 mb-[22px]">
           <h4 className={H4}>{PUBLICOS[pub]}</h4>
           {cat?.ambientes.filter((r) => r.publico === pub).map((r) => (
             <button key={r.slug} aria-current={e.vista === "resultados" && e.ambiente === r.slug && !e.q} onClick={() => { hecho?.(); irAmbiente(r.slug); }}
-              className={`cursor-pointer flex items-center gap-3 py-1.5 px-2 rounded-xl w-full text-ink text-left focus-visible:outline-2 aria-[current=true]:shadow-[inset_0_0_0_1.5px_var(--gold)] ${fondo}`}>
+              className={BTN_LATERAL}>
               <span className="size-[46px] rounded-[10px] overflow-hidden bg-surface-2 flex-none">{r.portada && <Foto src={r.portada} alt="" className="w-full h-full object-cover" />}</span>
               <span className="text-[15px] font-semibold leading-[1.25]">{r.nombre}<small className="block font-medium text-[12.5px] text-muted">{r.n} modelos</small></span>
             </button>
@@ -238,6 +252,7 @@ export default function Web() {
   const [navOculta, setNavOculta] = useState(false); // celular: el encabezado se va al bajar y quedan dos botones flotantes
   const [pista, setPista] = useState(false); // "Decime lo que estás buscando" al lado de la lupa
   const [grupo, setGrupo] = useState<string>(GRUPOS_TRABAJO[0][0]);
+  const [lineaDe, setLineaDe] = useState<Record<string, string>>({}); // Colores: la línea elegida de cada proveedor ("" o nada = todas)
   const caja = useRef<HTMLDivElement>(null), btnCerrar = useRef<HTMLButtonElement>(null), centinela = useRef<HTMLDivElement>(null);
   const q2 = useRef<HTMLInputElement>(null), galeria = useRef<HTMLDivElement>(null);
   const foco = useRef<HTMLElement | null>(null), avisoT = useRef(0);
@@ -249,11 +264,12 @@ export default function Web() {
   }
 
   useEffect(() => {
-    if (CATALOGO) setE((x) => ({ ...x, vista: "resultados", solo: true })); // así no se ve el inicio mientras carga
+    if (COLORES) setE((x) => ({ ...x, vista: "colores" }));
+    else if (CATALOGO) setE((x) => ({ ...x, vista: "resultados", solo: true })); // así no se ve el inicio mientras carga
     api("web").then((d) => {
       const c = armarCatalogo(d), a = c.ambientes.find((r) => r.slug === CATALOGO);
       setCat(c);
-      if (CATALOGO) setE((x) => a
+      if (CATALOGO && !COLORES) setE((x) => a
         ? { ...x, ambiente: a.slug, publico: a.publico, tipo: a.tipos.find((t) => slug(t) === slug(PEDIDO.get("tipo") || "")) || null }
         : { ...x, vista: "inicio", solo: false });
     }).catch((err: Error) => mostrarAviso(err.message));
@@ -294,6 +310,10 @@ export default function Web() {
   function irInicio(ancla?: string) {
     cerrarHoja();
     navegar({ vista: "inicio" }, ancla);
+  }
+  function irColores() {
+    cerrarHoja(); setBusqueda("");
+    navegar({ vista: "colores" });
   }
   function buscar(ev: FormEvent) {
     ev.preventDefault();
@@ -389,21 +409,22 @@ export default function Web() {
       chicos: P.filter((p) => R[p.ambiente].publico === "casa" && (anchoDe(p) ?? 61) <= 60 && p.fotos.length).slice(0, 3),
       led: P.filter((p) => R[p.ambiente].publico === "casa" && esLed(p) && p.fotos.length).sort(porFotos).slice(0, 10),
       negocios: ["kiosco", "local", "panaderia", "unas", "ropa", "oficina"].flatMap((r) => P.filter((p) => p.ambiente === r && p.fotos.length).sort(porFotos).slice(0, 2)),
+      colores: cat.proveedores.flatMap((p) => p.lineas.flatMap((l) => l.colores.slice(0, 2))), // dos de cada línea
     };
   }, [cat]);
 
-  const acciones: Acciones = { wa, abrir: (p) => abrirHoja({ modelo: p }), irAmbiente, irInicio };
+  const acciones: Acciones = { wa, abrir: (p) => abrirHoja({ modelo: p }), abrirColor: (c) => abrirHoja({ color: c }), irAmbiente, irInicio, irColores };
   const amb = e.ambiente && cat ? cat.R[e.ambiente] : null;
   const pub = amb ? amb.publico : e.publico;
   const tipos = amb && !e.q ? amb.tipos : [];
   const trabajos = cat ? cat.trabajos.filter((t) => grupoDe(t) === grupo) : [];
   const cuadro = (titulo: string, items: ItemCuadro[] | undefined, link: string, alLink: () => void, soloCompu?: boolean) =>
     <Cuadro titulo={titulo} items={items || []} link={link} alLink={alLink} irAmbiente={irAmbiente} soloCompu={soloCompu} />;
-  const lateral = { cat, e, irAmbiente, irPublico, irInicio };
+  const lateral = { cat, e, irAmbiente, irPublico, irInicio, irColores };
 
   return (
     <AccionesCtx.Provider value={acciones}>
-      <title>La Unión Muebles</title>
+      <title>{e.vista === "colores" ? "Colores · La Unión Muebles" : "La Unión Muebles"}</title>
       <Sprite />
 
       <div className="bg-night text-night-ink text-[12px] tracking-[.12em] uppercase text-center py-[7px] px-(--gutter)">
@@ -513,6 +534,17 @@ export default function Web() {
                 <div className={`${FILA_PRINCIPAL} ${LISTA_INICIO}`}>{inicio?.destacados.map((p) => <Tarjeta key={p.id} p={p} modo="inicio" />)}</div>
               </div>
             </section>
+
+            {cat && inicio && inicio.colores.length > 0 && (
+              <section className={SECCION}>
+                <div className={WRAP_P}>
+                  <Cabeza titulo="Elegí el color" bajada={`${cat.colores.length} colores y texturas para tu mueble. Tocá uno para verlo de cerca.`}>
+                    <button className={LINK} onClick={irColores}>Ver todos {FLECHA}</button>
+                  </Cabeza>
+                  <div className={FILA_PRINCIPAL}>{inicio.colores.map((c) => <Muestra key={c.id} c={c} className="flex-[0_0_128px] snap-start sm:basis-[150px]" />)}</div>
+                </div>
+              </section>
+            )}
 
             <section className={SECCION}>
               <div className={WRAP_P}>
@@ -751,6 +783,64 @@ export default function Web() {
               <div className="flex mt-[26px]" />{/* el espacio que dejaba el botón "Ver más" (flex: así el margen no se pierde) */}
             </div>
           </div>
+
+          {/* ---------- COLORES: separados por proveedor y, adentro, por línea ---------- */}
+          <div hidden={e.vista !== "colores" || !cat}>
+            {cat && (
+              <div className={WRAP_P}>
+                <nav className="flex gap-1.5 flex-wrap text-[13.5px] text-muted pt-[18px]" aria-label="Estás en">
+                  <button className="cursor-pointer text-gold-ink font-semibold" onClick={() => irInicio()}>Inicio</button><span>›</span><span>Colores</span>
+                </nav>
+                <div className="grid gap-1.5 mt-2.5 mb-3.5">
+                  <h1 className="text-[clamp(30px,7.6vw,52px)] leading-[1.05]">Colores</h1>
+                  <p className="text-muted max-w-[58ch]">Los colores y texturas con los que fabricamos tu mueble, de cada proveedor. Tocá uno para verlo de cerca y en un ambiente.</p>
+                  <a className={`${BTN_SM} justify-self-start mt-1`} target="_blank" rel="noopener"
+                    href={`https://wa.me/?text=${encodeURIComponent(`Colores · La Unión Muebles\n${location.origin}${location.pathname.replace(/colores\/?$/, "")}?catalogo=colores`)}`}>
+                    <I n="wa" />Compartir por WhatsApp
+                  </a>
+                </div>
+                {!cat.colores.length && (
+                  <div className="text-center py-9 px-3 text-muted grid gap-3 justify-items-center">
+                    <p>Todavía no cargamos los colores. Pedinos las muestras por WhatsApp.</p>
+                    <a className={BTN_ORO} target="_blank" rel="noopener" href={wa("Hola! Quiero ver los colores para mi mueble.")}><I n="chat" />Consultar por WhatsApp</a>
+                  </div>
+                )}
+                {cat.proveedores.map((pr, k) => {
+                  const sel = lineaDe[pr.nombre];
+                  return (
+                    <section key={pr.nombre} className={k ? "pt-6 mt-9 border-t border-line" : "mt-6"} aria-label={`Colores de ${pr.nombre}`}>
+                      <div className="flex justify-between items-end gap-3 mb-3">
+                        <div><span className={EYEBROW}>Proveedor</span><h2 className="text-[clamp(26px,6.4vw,38px)] leading-[1.1] mt-1">{pr.nombre}</h2></div>
+                        <span className="text-[13.5px] text-muted tabular-nums">{pr.n} colores</span>
+                      </div>
+                      {pr.lineas.length > 1 && (
+                        <div className={CHIPS} role="group" aria-label={`Líneas de ${pr.nombre}`}>
+                          <button className={CHIP_BTN} aria-pressed={!sel} onClick={() => setLineaDe((x) => ({ ...x, [pr.nombre]: "" }))}>Todas</button>
+                          {pr.lineas.map((l) => (
+                            <button key={l.nombre} className={CHIP_BTN} aria-pressed={sel === l.nombre} onClick={() => setLineaDe((x) => ({ ...x, [pr.nombre]: l.nombre }))}>{l.nombre}</button>
+                          ))}
+                        </div>
+                      )}
+                      {pr.lineas.filter((l) => !sel || l.nombre === sel).map((l) => (
+                        <div key={l.nombre} className="mt-6">
+                          <div className="flex items-baseline gap-x-2.5 flex-wrap mb-3">
+                            <h3 className="text-[22px] leading-[1.15]">Línea {l.nombre}</h3>
+                            <span className="text-[13px] text-muted">{l.colores.length} {l.colores.length === 1 ? "color" : "colores"}{l.colores[0].material ? ` · ${l.colores[0].material}` : ""}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-x-2.5 gap-y-4 sm:grid-cols-4 lg:grid-cols-6">{l.colores.map((c) => <Muestra key={c.id} c={c} />)}</div>
+                        </div>
+                      ))}
+                    </section>
+                  );
+                })}
+                {cat.colores.length > 0 && (
+                  <p className="flex gap-2 items-start text-[13.5px] text-ink bg-surface-2 rounded-xl py-2.5 px-3 mt-9" role="note">
+                    <I n="info" className="size-[17px] flex-none text-gold-ink mt-px" />Las fotos son de cada proveedor y en la pantalla el color puede verse distinto. En el showroom de Lomas de Tafí podés ver las muestras.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </main>
       </div>
 
@@ -770,6 +860,7 @@ export default function Web() {
             <button onClick={() => irInicio("#nosotros")}>Quiénes somos</button>
             <button onClick={() => irInicio("#contacto")}>Dónde estamos</button>
             <button onClick={() => irInicio("#proyectos")}>Trabajos a medida</button>
+            <button onClick={irColores}>Colores</button>
             <a className="cursor-pointer text-gold-ink font-semibold" href="/seguimiento/">Seguí tu pedido</a>
           </div>
           <small className="text-[13px] text-muted">© 2026 La Unión Muebles. Fotos de trabajos reales del taller.</small>
@@ -800,7 +891,9 @@ export default function Web() {
           <div className="sticky top-0 z-3 flex justify-end py-2.5 px-3 h-0 overflow-visible lg:p-4">
             <button ref={btnCerrar} className={BTN_CERRAR} aria-label="Cerrar" onClick={cerrarHoja}><I n="x" /></button>
           </div>
-          {hoja && cat && ("modelo" in hoja ? <DetalleModelo key={hoja.modelo.id} p={hoja.modelo} cat={cat} /> : <DetalleTrabajo key={hoja.trabajo.id} t={hoja.trabajo} />)}
+          {hoja && cat && ("modelo" in hoja ? <DetalleModelo key={hoja.modelo.id} p={hoja.modelo} cat={cat} />
+            : "trabajo" in hoja ? <DetalleTrabajo key={hoja.trabajo.id} t={hoja.trabajo} />
+            : <DetalleColor key={hoja.color.id} c={hoja.color} cat={cat} />)}
         </div>
       </div>
 

@@ -2,35 +2,30 @@
 // Nueva venta en 5 pasos, como la ficha en papel: vendedor y cliente, datos comerciales (solo si compra para un negocio),
 // muebles, entrega y plan de pago, y revisar. El borrador queda en la pestaña (sessionStorage) hasta guardar.
 // Solo los campos de la ficha que están en la base: sin lugar de venta, cónyuge, mapa ni "entregó".
+// Cada mueble sale de un presupuesto: uno ya hecho ("Agregar de Presupuestos") o uno nuevo, que se arma en el editor de presupuestos
+// (?venta=1) y vuelve acá con ?presupuesto=<id>.
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, media, subir } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
-import { ars, fecha, hoyISO, medidas, norm, normTelefono, numeroVenta, parsePesos, pesos, telefonoLindo } from "@/lib/formato";
+import { ars, fecha, hoyISO, norm, numeroVenta, parsePesos, pesos, precioPresupuesto, telefonoLindo } from "@/lib/formato";
 import { ESTADO_CIVIL, FRECUENCIA, direccionTexto, textoCuotas } from "@/lib/ventas";
-import type { Cliente, ClienteFila, EstadoCivil, Frecuencia, OpcionesVenta, PagoGuardar, ProductoFila, TipoEntrega, VentaGuardar } from "@/lib/tipos";
+import type { Cliente, ClienteFila, Frecuencia, Monto, OpcionesVenta, PagoGuardar, PresupuestoFila, TipoEntrega, VentaGuardar } from "@/lib/tipos";
+import { CamposCliente, CamposComercio, aClienteForm, clave, clientePedido, clienteVacio, faltanCliente, faltanComercio, type ClienteForm, type Dir } from "@/components/FormCliente";
 import { Icono } from "@/components/Icono";
 import { Modal } from "@/components/Modal";
 import { useAviso } from "@/components/Avisos";
 
 const BORRADOR = "lu-venta-borrador";
-const clave = () => String(Math.random());
 
-/** El formulario guarda todo como texto, como lo escribe la persona. Se convierte al calcular y al guardar. */
-interface Dir { calle: string; numero: string; piso: string; departamento: string; barrio: string; localidad_id: string }
-interface Tel { k: string; numero: string; es_whatsapp: boolean }
-interface Item { k: string; producto_id: number | null; codigo: string; nombre: string; descripcion: string; cantidad: string; precio: string; notas_taller: string; adjuntos: string[]; foto: string | null }
+/** El formulario guarda todo como texto, como lo escribe la persona. Se convierte al calcular y al guardar. Los datos del cliente, en ClienteForm. */
+interface Item { k: string; presupuesto_id: number | null; producto_id: number | null; codigo: string; nombre: string; descripcion: string; cantidad: string; precio: string; notas_taller: string; adjuntos: string[]; foto: string | null }
 interface Pago { k: string; medio_pago_id: string; monto: string; cuenta_bancaria_id: string; posnet_plan_id: string }
-interface Form {
+interface Form extends ClienteForm {
   paso: Paso;
   vendedor_id: string;
   cliente_id: number | null;
   anteriores: { id: number; numero: number }[]; // ventas anteriores del cliente elegido
-  nombre: string; apellido: string; dni: string; estado_civil: EstadoCivil | ""; fecha_nacimiento: string; email: string; margen_credito: string;
-  telefonos: Tel[];
-  direccion: Dir;
-  tipo: "casa" | "negocio";
-  comercio: { nombre_comercio: string; rubro: string; direccion: Dir };
   items: Item[];
   fecha_entrega: string; tipo_entrega: TipoEntrega; descuento: string; notas: string;
   pagos: Pago[];
@@ -42,15 +37,11 @@ type Paso = "cliente" | "comercio" | "muebles" | "pago" | "revisar";
 const PASOS: Record<Paso, string> = { cliente: "Vendedor y cliente", comercio: "Datos comerciales", muebles: "Muebles", pago: "Entrega y pago", revisar: "Revisar y guardar" };
 const pasosDe = (f: Form): Paso[] => (["cliente", "comercio", "muebles", "pago", "revisar"] as Paso[]).filter((p) => p !== "comercio" || f.tipo === "negocio");
 
-const dirVacia = (localidad = ""): Dir => ({ calle: "", numero: "", piso: "", departamento: "", barrio: "", localidad_id: localidad });
 const masDias = (dias: number) => new Date(new Date(hoyISO() + "T00:00").getTime() + dias * 864e5).toISOString().slice(0, 10);
 function nuevo(op: OpcionesVenta, empleado: number | null): Form {
-  const smt = String(op.localidades.find((l) => l.nombre === "San Miguel de Tucumán")?.id ?? "");
   return {
     paso: "cliente", vendedor_id: empleado ? String(empleado) : "", cliente_id: null, anteriores: [],
-    nombre: "", apellido: "", dni: "", estado_civil: "", fecha_nacimiento: "", email: "", margen_credito: "",
-    telefonos: [{ k: clave(), numero: "", es_whatsapp: true }], direccion: dirVacia(smt), tipo: "casa",
-    comercio: { nombre_comercio: "", rubro: "", direccion: dirVacia() },
+    ...clienteVacio(op),
     items: [], fecha_entrega: masDias(21), tipo_entrega: "envio", descuento: "", notas: "",
     pagos: [pagoVacio(op)], financia: false,
     credito: { cuotas: "", monto_cuota: "", frecuencia_cuotas: "", fecha_primer_vencimiento: "", referencia: "" },
@@ -58,8 +49,18 @@ function nuevo(op: OpcionesVenta, empleado: number | null): Form {
 }
 const pagoVacio = (op: OpcionesVenta): Pago => ({ k: clave(), medio_pago_id: String(op.medios.find((m) => m.tipo === "efectivo")?.id ?? op.medios[0]?.id ?? ""), monto: "", cuenta_bancaria_id: String(op.cuentas[0]?.id ?? ""), posnet_plan_id: "" });
 
-const aDir = (d: Cliente["direccion"]): Dir => (d ? { calle: d.calle, numero: d.numero ?? "", piso: d.piso ?? "", departamento: d.departamento ?? "", barrio: d.barrio ?? "", localidad_id: String(d.localidad_id) } : dirVacia());
-const dirPedido = (d: Dir) => ({ ...d, localidad_id: Number(d.localidad_id) || null });
+/** El precio de un presupuesto: el final o, si no tiene, costo × multiplicador. */
+const precioDe = (p: { precio_final: Monto | null; costo: Monto; multiplicador: Monto }) => Number(p.precio_final) || precioPresupuesto(p.costo, p.multiplicador);
+/** El mueble que sale de un presupuesto: su nombre, su foto (o la del modelo), el código del modelo y su precio.
+ *  La descripción arranca con el nombre (las notas del presupuesto son internas: en los del Excel dicen de qué hoja vinieron). */
+async function desdePresupuesto(id: number): Promise<Item> {
+  const { presupuesto: p } = await api("presupuesto", { query: { id: String(id) } });
+  return { k: clave(), presupuesto_id: p.id, producto_id: p.producto_id, codigo: p.codigo ?? "", nombre: p.nombre, descripcion: p.nombre,
+    cantidad: "1", precio: pesos(precioDe(p)), notas_taller: "", adjuntos: [], foto: p.foto };
+}
+
+/** Un cliente de la agenda en el paso 1. comercio: el que ya estaba cargado, si el cliente no tiene uno. */
+const delCliente = (x: Cliente, anteriores: Form["anteriores"], comercio: Form["comercio"]): Partial<Form> => ({ cliente_id: x.id, anteriores, ...aClienteForm(x, comercio) });
 
 /** Plata escrita ("150.000") → número; vacío o mal escrito = 0. */
 const plata = (s: string) => { const v = parsePesos(s); return v != null && Number.isFinite(v) ? v : 0; };
@@ -89,21 +90,9 @@ function faltan(paso: Paso, f: Form, op: OpcionesVenta): string[] {
   const e: string[] = [];
   if (paso === "cliente") {
     if (!f.vendedor_id) e.push("el vendedor");
-    if (!f.nombre.trim()) e.push("el nombre");
-    if (!f.apellido.trim()) e.push("el apellido");
-    if (!/^[0-9A-Za-z]{6,12}$/.test(f.dni.replace(/[\s.-]/g, ""))) e.push("el DNI");
-    const tels = f.telefonos.filter((t) => t.numero.trim());
-    if (!tels.length || tels.some((t) => !/^549\d{10}$/.test(normTelefono(t.numero)))) e.push("los teléfonos (con código de área, sin 0 ni 15)");
-    if (f.email.trim() && !/^\S+@\S+\.\S+$/.test(f.email.trim())) e.push("el email");
-    if (!f.direccion.calle.trim()) e.push("la calle");
-    if (!f.direccion.localidad_id) e.push("la localidad");
+    e.push(...faltanCliente(f));
   }
-  if (paso === "comercio") {
-    if (!f.comercio.nombre_comercio.trim()) e.push("el nombre del comercio");
-    if (!f.comercio.rubro.trim()) e.push("el rubro");
-    const d = f.comercio.direccion;
-    if ((d.numero.trim() || d.barrio.trim() || d.localidad_id) && (!d.calle.trim() || !d.localidad_id)) e.push("la calle y la localidad del domicilio comercial (o dejalo vacío)");
-  }
+  if (paso === "comercio") e.push(...faltanComercio(f));
   if (paso === "muebles" && !f.items.length) e.push("al menos un mueble");
   if (paso === "pago") {
     const c = cuentas(f, op);
@@ -125,13 +114,8 @@ function aPedido(f: Form): VentaGuardar {
   const pago = (p: Pago): PagoGuardar => ({ medio_pago_id: Number(p.medio_pago_id), monto: parsePesos(p.monto), cuenta_bancaria_id: Number(p.cuenta_bancaria_id) || null, posnet_plan_id: Number(p.posnet_plan_id) || null, referencia: "" });
   return {
     vendedor_id: Number(f.vendedor_id) || null,
-    cliente: {
-      id: f.cliente_id, nombre: f.nombre, apellido: f.apellido, dni: f.dni, estado_civil: f.estado_civil, fecha_nacimiento: f.fecha_nacimiento,
-      telefonos: f.telefonos.filter((t) => t.numero.trim()).map((t) => ({ numero_completo: normTelefono(t.numero), es_whatsapp: t.es_whatsapp })),
-      email: f.email, direccion: dirPedido(f.direccion), margen_credito: parsePesos(f.margen_credito), tipo: f.tipo,
-      comercio: f.tipo === "negocio" ? { ...f.comercio, direccion: dirPedido(f.comercio.direccion) } : null,
-    },
-    items: f.items.map((x) => ({ producto_id: x.producto_id, codigo: x.codigo, nombre: x.nombre, descripcion: x.descripcion, cantidad: entero(x.cantidad) || null, precio_unitario: parsePesos(x.precio), notas_taller: x.notas_taller, adjuntos: x.adjuntos })),
+    cliente: clientePedido(f, f.cliente_id),
+    items: f.items.map((x) => ({ producto_id: x.producto_id, presupuesto_id: x.presupuesto_id ?? null, codigo: x.codigo, nombre: x.nombre, descripcion: x.descripcion, cantidad: entero(x.cantidad) || null, precio_unitario: parsePesos(x.precio), notas_taller: x.notas_taller, adjuntos: x.adjuntos })),
     fecha_entrega: f.fecha_entrega, tipo_entrega: f.tipo_entrega, descuento: parsePesos(f.descuento), notas: f.notas,
     pagos: f.pagos.map(pago),
     credito: f.financia ? { cuotas: entero(f.credito.cuotas) || null, monto_cuota: parsePesos(f.credito.monto_cuota), frecuencia_cuotas: f.credito.frecuencia_cuotas, fecha_primer_vencimiento: f.credito.fecha_primer_vencimiento, referencia: f.credito.referencia } : null,
@@ -148,7 +132,10 @@ export default function NuevaVenta() {
   const [guardando, setGuardando] = useState(false);
   const [hecha, setHecha] = useState<{ id: number; numero: number } | null>(null);
   const [mueble, setMueble] = useState<{ i: number | null; item: Item } | null>(null); // el que se edita en la ventana
-  const [catalogo, setCatalogo] = useState(false);
+  const [presupuestos, setPresupuestos] = useState(false); // la ventana para elegir uno
+
+  // Un presupuesto elegido (o recién creado) se abre en la ventana del mueble para poner la cantidad, el precio y las notas
+  const agregar = (id: number) => desdePresupuesto(id).then((item) => setMueble({ i: null, item }), (e: Error) => avisar(e.message, { tono: "bad", ms: 6000 }));
 
   useEffect(() => {
     api("venta/nueva").then((r) => {
@@ -156,6 +143,13 @@ export default function NuevaVenta() {
       let borrador: Form | null = null;
       try { borrador = JSON.parse(sessionStorage.getItem(BORRADOR) || "null"); } catch {}
       setF(borrador?.paso ? borrador : nuevo(r, usuario?.empleado_id ?? null));
+      const parametros = new URLSearchParams(location.search);
+      const creado = Number(parametros.get("presupuesto")); // vuelve de "Presupuesto nuevo": se agrega a la venta
+      const cliente = Number(parametros.get("cliente")); // viene de la ficha del cliente: se carga en el paso 1 (los muebles y pagos ya cargados quedan)
+      if (creado || cliente) history.replaceState(null, "", location.pathname);
+      if (creado) agregar(creado);
+      if (cliente) api("cliente", { query: { id: String(cliente) } }).then(({ cliente: x, ventas }) => setF((g) => g && { ...g, ...delCliente(x, ventas, g.comercio), paso: "cliente" }),
+        (e: Error) => avisar(e.message, { tono: "bad", ms: 6000 }));
     }, (e: Error) => setError(e.message));
   }, [usuario?.empleado_id]);
   useEffect(() => { if (f) try { sessionStorage.setItem(BORRADOR, JSON.stringify(f)); } catch {} }, [f]);
@@ -197,7 +191,7 @@ export default function NuevaVenta() {
     comercio: <PasoComercio f={form} op={op} cambiar={cambiar} />,
     muebles: (
       <div className="stack">
-        <div><h2>Muebles</h2><p className="muted small">Cada mueble que se vende. Del catálogo se completan el código, la descripción, la foto y el precio; a medida, se escriben a mano.</p></div>
+        <div><h2>Muebles</h2><p className="muted small">Cada mueble sale de un presupuesto, con su nombre, su foto y su precio final. Si el trabajo todavía no tiene presupuesto, armalo desde acá: al guardarlo, vuelve a la venta.</p></div>
         {form.items.length ? form.items.map((x, n) => (
           <div key={x.k} className="card" style={{ display: "grid", gridTemplateColumns: "64px minmax(0,1fr) auto", gap: 12, padding: 12, alignItems: "center" }}>
             {x.foto ? <img className="thumb-lg" src={media(x.foto)} alt="" /> : <span className="thumb-lg" style={{ display: "grid", placeItems: "center", color: "var(--faint)" }}><Icono n="edit" /></span>}
@@ -211,10 +205,10 @@ export default function NuevaVenta() {
               <button type="button" className="btn btn-sm btn-ghost" aria-label="Quitar" onClick={() => cambiar({ items: form.items.filter((_, j) => j !== n) })}><Icono n="trash" /></button>
             </div>
           </div>
-        )) : <div className="empty" style={{ border: "1.5px dashed var(--line-2)", borderRadius: 14 }}><Icono n="catalog" /><p>Todavía no agregaste muebles.</p></div>}
+        )) : <div className="empty" style={{ border: "1.5px dashed var(--line-2)", borderRadius: 14 }}><Icono n="calc" /><p>Todavía no agregaste muebles.</p></div>}
         <div className="row">
-          <button type="button" className="btn btn-primary" onClick={() => setCatalogo(true)}><Icono n="catalog" />Agregar del catálogo</button>
-          <button type="button" className="btn" onClick={() => setMueble({ i: null, item: { k: clave(), producto_id: null, codigo: "", nombre: "", descripcion: "", cantidad: "1", precio: "", notas_taller: "", adjuntos: [], foto: null } })}><Icono n="plus" />Mueble a medida</button>
+          <button type="button" className="btn btn-primary" onClick={() => setPresupuestos(true)}><Icono n="calc" />Agregar de Presupuestos</button>
+          <Link className="btn" href="/admin/presupuestos/editar/?venta=1"><Icono n="plus" />Presupuesto nuevo</Link>
         </div>
       </div>
     ),
@@ -226,7 +220,7 @@ export default function NuevaVenta() {
     <>
       <title>Nueva venta · La Unión</title>
       <div className="page-head">
-        <div><h1>Nueva venta</h1><p>Se carga como la ficha en papel. Al guardar, recibe su número y se puede imprimir para que el cliente la firme.</p></div>
+        <div><h1>Nueva venta</h1><p>Se carga como la ficha en papel. Al guardar, recibe su número y se puede imprimir para que el cliente la firme. Los campos con * son obligatorios.</p></div>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => { if (confirm("¿Borrar todo lo cargado y empezar de nuevo?")) { setF(nuevo(op, usuario?.empleado_id ?? null)); setAviso(""); } }}>Empezar de nuevo</button>
       </div>
       <div className="steps"><ol>{pasos.map((p, n) => (
@@ -263,14 +257,7 @@ export default function NuevaVenta() {
         </aside>
       </div>
 
-      {catalogo && <ElegirModelo alCerrar={() => setCatalogo(false)} alElegir={async (p) => {
-        setCatalogo(false);
-        let descripcion = "";
-        try { descripcion = (await api("producto", { query: { id: String(p.id) } })).producto.descripcion ?? ""; } catch {}
-        const med = medidas(p);
-        setMueble({ i: null, item: { k: clave(), producto_id: p.id, codigo: p.codigo ?? "", nombre: p.nombre, descripcion: descripcion || [p.nombre, med].filter(Boolean).join(" · "),
-          cantidad: "1", precio: p.precio_local ? pesos(p.precio_local) : "", notas_taller: "", adjuntos: [], foto: p.foto } });
-      }} />}
+      {presupuestos && <ElegirPresupuesto alCerrar={() => setPresupuestos(false)} alElegir={(id) => { setPresupuestos(false); agregar(id); }} />}
       {mueble && <EditarMueble inicial={mueble.item} alCerrar={() => setMueble(null)} alGuardar={(x) => {
         cambiar({ items: mueble.i === null ? [...form.items, x] : form.items.map((y, j) => (j === mueble.i ? x : y)) });
         setMueble(null);
@@ -293,23 +280,14 @@ function PasoCliente({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: 
 
   async function elegir(id: number) {
     const { cliente: x, ventas } = await api("cliente", { query: { id: String(id) } });
-    cambiar({
-      cliente_id: x.id, anteriores: ventas, nombre: x.nombre, apellido: x.apellido, dni: x.dni ?? "", estado_civil: x.estado_civil ?? "", fecha_nacimiento: x.fecha_nacimiento ?? "",
-      email: x.email ?? "", margen_credito: x.margen_credito == null ? "" : pesos(x.margen_credito),
-      telefonos: x.telefonos.length ? x.telefonos.map((t) => ({ k: clave(), numero: telefonoLindo(t.numero_completo), es_whatsapp: !!t.es_whatsapp })) : [{ k: clave(), numero: "", es_whatsapp: true }],
-      direccion: aDir(x.direccion), tipo: x.tipo,
-      comercio: x.comercio ? { nombre_comercio: x.comercio.nombre_comercio ?? "", rubro: x.comercio.rubro ?? "", direccion: aDir(x.comercio.direccion) } : f.comercio,
-    });
+    cambiar(delCliente(x, ventas, f.comercio));
     setQ("");
   }
-  const campo = (k: "nombre" | "apellido" | "dni" | "email" | "fecha_nacimiento") => ({ value: f[k], onChange: (e: { target: { value: string } }) => cambiar({ [k]: e.target.value }) });
-  const tel = (n: number, c: Partial<Tel>) => cambiar({ telefonos: f.telefonos.map((t, j) => (j === n ? { ...t, ...c } : t)) });
-  const area = op.localidades.find((l) => String(l.id) === f.direccion.localidad_id)?.codigo_area ?? "381";
 
   return (
     <div className="stack">
       <h2>Vendedor y cliente</h2>
-      <label className="field" style={{ maxWidth: 360 }}><span>Vendedor</span>
+      <label className="field" style={{ maxWidth: 360 }}><span>Vendedor *</span>
         <select className="select" value={f.vendedor_id} onChange={(e) => cambiar({ vendedor_id: e.target.value })}>
           <option value="">Elegí quién vendió</option>
           {op.vendedores.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
@@ -333,115 +311,46 @@ function PasoCliente({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: 
         </div>
       )}
 
-      <div className="grid-2">
-        <label className="field"><span>Nombre</span><input className="input" autoComplete="off" {...campo("nombre")} /></label>
-        <label className="field"><span>Apellido</span><input className="input" autoComplete="off" {...campo("apellido")} /></label>
-        <label className="field"><span>DNI</span><input className="input" inputMode="numeric" placeholder="30123456" autoComplete="off" {...campo("dni")} /></label>
-        <label className="field"><span>Estado civil (opcional)</span>
-          <select className="select" value={f.estado_civil} onChange={(e) => cambiar({ estado_civil: e.target.value as EstadoCivil | "" })}>
-            <option value="">—</option>{Object.entries(ESTADO_CIVIL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select></label>
-        <label className="field"><span>Fecha de nacimiento (opcional)</span><input className="input" type="date" max={hoyISO()} {...campo("fecha_nacimiento")} /></label>
-        <label className="field"><span>Email (opcional)</span><input className="input" type="email" autoComplete="off" placeholder="Para mandarle las novedades del pedido" {...campo("email")} /></label>
-      </div>
-
-      <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
-        <legend className="label" style={{ marginBottom: 6 }}>Teléfonos</legend>
-        <div className="stack-sm">{f.telefonos.map((t, n) => (
-          <div key={t.k} className="row" style={{ flexWrap: "nowrap" }}>
-            <input className="input" inputMode="tel" placeholder={`${area} 555-1203`} aria-label={`Teléfono ${n + 1}`} value={t.numero} style={{ maxWidth: 220 }}
-              onChange={(e) => tel(n, { numero: e.target.value })}
-              onBlur={(e) => { const v = normTelefono(e.target.value); if (/^549\d{10}$/.test(v)) tel(n, { numero: telefonoLindo(v) }); }} />
-            <label className="check"><input type="checkbox" checked={t.es_whatsapp} onChange={(e) => tel(n, { es_whatsapp: e.target.checked })} />WhatsApp</label>
-            {f.telefonos.length > 1 && <button type="button" className="icon-btn" aria-label={`Quitar teléfono ${n + 1}`} onClick={() => cambiar({ telefonos: f.telefonos.filter((_, j) => j !== n) })}><Icono n="trash" /></button>}
-          </div>))}
-          <div><button type="button" className="btn btn-sm" onClick={() => cambiar({ telefonos: [...f.telefonos, { k: clave(), numero: "", es_whatsapp: false }] })}><Icono n="plus" />Otro teléfono</button></div>
-          <small className="muted">Con código de área, sin 0 ni 15. El primero es el principal.</small>
-        </div>
-      </fieldset>
-
-      <CamposDireccion titulo="Dirección" d={f.direccion} op={op} piso cambiar={(d) => cambiar({ direccion: d })} />
-
-      <div className="grid-2" style={{ alignItems: "end" }}>
-        <label className="field"><span>Margen de crédito (opcional)</span>
-          <span className="input-money"><span>$</span><input inputMode="numeric" value={f.margen_credito} placeholder="0"
-            onChange={(e) => cambiar({ margen_credito: e.target.value })} onBlur={(e) => { const v = parsePesos(e.target.value); if (v != null && Number.isFinite(v)) cambiar({ margen_credito: pesos(v) }); }} /></span></label>
-        <div className="field"><span>Compra para</span>
-          <div className="seg" role="group">
-            <button type="button" aria-pressed={f.tipo === "casa"} onClick={() => cambiar({ tipo: "casa" })}>Su casa</button>
-            <button type="button" aria-pressed={f.tipo === "negocio"} onClick={() => cambiar({ tipo: "negocio" })}>Un negocio</button>
-          </div></div>
-      </div>
+      <CamposCliente d={f} op={op} cambiar={cambiar} />
     </div>
-  );
-}
-
-function CamposDireccion({ titulo, d, op, piso = false, cambiar }: { titulo: string; d: Dir; op: OpcionesVenta; piso?: boolean; cambiar: (d: Dir) => void }) {
-  const campo = (k: keyof Dir) => ({ value: d[k], onChange: (e: { target: { value: string } }) => cambiar({ ...d, [k]: e.target.value }) });
-  const loc = op.localidades.find((l) => String(l.id) === d.localidad_id);
-  const provincias = [...new Set(op.localidades.map((l) => l.provincia))];
-  return (
-    <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
-      <legend className="label" style={{ marginBottom: 6 }}>{titulo}</legend>
-      <div className="grid-4">
-        <label className="field" style={{ gridColumn: "span 2" }}><span>Calle</span><input className="input" autoComplete="off" {...campo("calle")} /></label>
-        <label className="field"><span>Número</span><input className="input" autoComplete="off" {...campo("numero")} /></label>
-        {piso ? <>
-          <label className="field"><span>Piso y depto.</span>
-            <span className="row" style={{ flexWrap: "nowrap", gap: 6 }}><input className="input" aria-label="Piso" placeholder="Piso" {...campo("piso")} /><input className="input" aria-label="Departamento" placeholder="Depto." {...campo("departamento")} /></span></label>
-        </> : <span />}
-        <label className="field" style={{ gridColumn: "span 2" }}><span>Barrio</span><input className="input" autoComplete="off" {...campo("barrio")} /></label>
-        <label className="field" style={{ gridColumn: "span 2" }}><span>Localidad</span>
-          <select className="select" {...campo("localidad_id")}>
-            <option value="">Elegí la localidad</option>
-            {provincias.map((p) => <optgroup key={p} label={p}>{op.localidades.filter((l) => l.provincia === p).map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}</optgroup>)}
-          </select>
-          {loc && <small>{loc.provincia}{loc.codigo_area && ` · código de área ${loc.codigo_area}`}</small>}</label>
-      </div>
-    </fieldset>
   );
 }
 
 /* ---------- paso 2 · datos comerciales ---------- */
 
 function PasoComercio({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: (c: Partial<Form>) => void }) {
-  const m = f.comercio;
-  const poner = (c: Partial<Form["comercio"]>) => cambiar({ comercio: { ...m, ...c } });
   return (
     <div className="stack">
       <div><h2>Datos comerciales</h2><p className="muted small">El cliente compra para su negocio.</p></div>
-      <div className="grid-2">
-        <label className="field"><span>Nombre del comercio</span><input className="input" placeholder="Kiosco El Paso" value={m.nombre_comercio} onChange={(e) => poner({ nombre_comercio: e.target.value })} /></label>
-        <label className="field"><span>Rubro</span><input className="input" list="rubros" placeholder="Kiosco" value={m.rubro} onChange={(e) => poner({ rubro: e.target.value })} />
-          <datalist id="rubros">{op.rubros.map((r) => <option key={r} value={r} />)}</datalist></label>
-      </div>
-      <CamposDireccion titulo="Domicilio comercial (opcional, si es distinto del de la casa)" d={m.direccion} op={op} cambiar={(d) => poner({ direccion: d })} />
+      <CamposComercio d={f} op={op} cambiar={cambiar} />
     </div>
   );
 }
 
 /* ---------- paso 3 · muebles ---------- */
 
-function ElegirModelo({ alElegir, alCerrar }: { alElegir: (p: ProductoFila) => void; alCerrar: () => void }) {
-  const [datos, setDatos] = useState<{ productos: ProductoFila[]; tipos: Map<number, string> } | null>(null);
+function ElegirPresupuesto({ alElegir, alCerrar }: { alElegir: (id: number) => void; alCerrar: () => void }) {
+  const [lista, setLista] = useState<PresupuestoFila[] | null>(null);
+  const [error, setError] = useState("");
   const [q, setQ] = useState("");
-  useEffect(() => {
-    api("catalogo").then((r) => setDatos({ productos: r.productos.filter((p) => !p.eliminado), tipos: new Map(r.categorias.map((c): [number, string] => [c.id, c.nombre])) }), () => setDatos({ productos: [], tipos: new Map() }));
-  }, []);
-  const nq = norm(q.trim());
-  const lista = (datos?.productos ?? []).filter((p) => !nq || nq.split(/\s+/).every((t) => norm(`${p.nombre} ${p.codigo ?? ""} ${datos?.tipos.get(p.categoria_id) ?? ""}`).includes(t))).slice(0, 40);
+  useEffect(() => { api("presupuestos").then((r) => setLista(r.presupuestos), (e: Error) => setError(e.message)); }, []);
+  const t = norm(q.trim()).split(/\s+/).filter(Boolean);
+  const filas = (lista ?? []).filter((p) => t.every((x) => norm(`${p.nombre} ${p.grupo ?? ""} ${p.producto ?? ""}`).includes(x))).slice(0, 60);
+  const nuevo = <Link href="/admin/presupuestos/editar/?venta=1">armá uno nuevo</Link>;
   return (
-    <Modal titulo="Elegí del catálogo" ancho alCerrar={alCerrar}>
+    <Modal titulo="Agregar de Presupuestos" ancho alCerrar={alCerrar}>
       <div className="stack-sm">
-        <input className="input" placeholder="Buscar: cómoda, maquillador, caramelera, código…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        {!datos ? <p className="muted">Cargando…</p> : lista.length ? (
-          <div className="pick">{lista.map((p) => (
-            <button key={p.id} type="button" onClick={() => alElegir(p)}>
-              {p.foto ? <img className="thumb" src={media(p.foto)} alt="" loading="lazy" /> : <span className="thumb" />}
-              <span className="grow" style={{ textAlign: "left" }}><b>{p.nombre}</b><br /><span className="small muted">{[p.codigo, datos.tipos.get(p.categoria_id), medidas(p)].filter(Boolean).join(" · ")}</span></span>
-              <span className="tnum small">{p.precio_local ? ars(p.precio_local) : ""}</span>
+        <input className="input" type="search" placeholder="Buscar: cómoda, placard, grupo o modelo…" aria-label="Buscar presupuestos" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        {error ? <p className="alert bad"><Icono n="alert" /><span>No se pudieron cargar los presupuestos: {error}</span></p>
+        : !lista ? <p className="muted">Cargando…</p>
+        : filas.length ? (
+          <div className="pick">{filas.map((p) => (
+            <button key={p.id} type="button" onClick={() => alElegir(p.id)}>
+              {p.foto ? <img className="thumb" src={media(p.foto)} alt="" loading="lazy" /> : <span className="thumb" style={{ display: "grid", placeItems: "center", color: "var(--faint)" }}><Icono n="image" /></span>}
+              <span className="grow" style={{ textAlign: "left" }}><b>{p.nombre}</b><br /><span className="small muted">{[p.grupo || "Sin grupo", p.producto && `Modelo: ${p.producto}`].filter(Boolean).join(" · ")}</span></span>
+              <span className="tnum small">{ars(precioDe(p))}</span>
             </button>))}</div>
-        ) : <p className="muted">No hay modelos con esa búsqueda. Cargalo como mueble a medida.</p>}
+        ) : <p className="muted">{lista.length ? "No hay presupuestos con esa búsqueda" : "Todavía no hay presupuestos"}: {nuevo}.</p>}
       </div>
     </Modal>
   );
@@ -470,18 +379,22 @@ function EditarMueble({ inicial, alGuardar, alCerrar }: { inicial: Item; alGuard
     alGuardar(x);
   }
   return (
-    <Modal titulo={x.producto_id ? x.nombre : inicial.nombre ? "Editar mueble" : "Mueble a medida"} ancho alCerrar={alCerrar}
+    <Modal titulo={inicial.nombre || "Mueble"} ancho alCerrar={alCerrar}
       pie={<><button type="button" className="btn" onClick={alCerrar}>Cancelar</button><button type="button" className="btn btn-primary" disabled={subiendo > 0} onClick={listo}>{subiendo ? "Subiendo fotos…" : "Listo"}</button></>}>
       <div className="stack">
-        {x.foto && <div className="row"><img className="thumb-lg" src={media(x.foto)} alt="" /><span className="small muted">Del catálogo. Cambiá lo que el cliente pida distinto.</span></div>}
+        {(x.foto || x.presupuesto_id) && <div className="row" style={{ flexWrap: "nowrap" }}>
+          {x.foto && <img className="thumb-lg" src={media(x.foto)} alt="" />}
+          <span className="small muted">{x.presupuesto_id ? "Del presupuesto" : "Del catálogo"}. Cambiá lo que el cliente pida distinto.
+            {x.presupuesto_id && <> <Link href={`/admin/presupuestos/editar/?id=${x.presupuesto_id}`} target="_blank">Ver el presupuesto</Link></>}</span>
+        </div>}
         <div className="grid-4">
-          <label className="field" style={{ gridColumn: "span 3" }}><span>Qué se fabrica</span><input className="input" value={x.nombre} placeholder="Placard a medida" onChange={(e) => poner({ nombre: e.target.value })} /></label>
+          <label className="field" style={{ gridColumn: "span 3" }}><span>Qué se fabrica *</span><input className="input" value={x.nombre} placeholder="Placard a medida" onChange={(e) => poner({ nombre: e.target.value })} /></label>
           <label className="field"><span>Código</span><input className="input" value={x.codigo} placeholder="CO-8C" onChange={(e) => poner({ codigo: e.target.value })} /></label>
         </div>
-        <label className="field"><span>Descripción</span><textarea className="textarea" rows={3} value={x.descripcion} placeholder="Cómoda 8 cajones, 140 × 90 × 40 cm, melamina blanca y roble Dakar" onChange={(e) => poner({ descripcion: e.target.value })} /></label>
+        <label className="field"><span>Descripción *</span><textarea className="textarea" rows={3} value={x.descripcion} placeholder="Cómoda 8 cajones, 140 × 90 × 40 cm, melamina blanca y roble Dakar" onChange={(e) => poner({ descripcion: e.target.value })} /></label>
         <div className="grid-3">
-          <label className="field"><span>Cantidad</span><input className="input" inputMode="numeric" value={x.cantidad} onChange={(e) => poner({ cantidad: e.target.value.replace(/\D/g, "") })} /></label>
-          <label className="field"><span>Precio de una unidad</span><span className="input-money"><span>$</span><input inputMode="numeric" value={x.precio} placeholder="0"
+          <label className="field"><span>Cantidad *</span><input className="input" inputMode="numeric" value={x.cantidad} onChange={(e) => poner({ cantidad: e.target.value.replace(/\D/g, "") })} /></label>
+          <label className="field"><span>Precio de una unidad *</span><span className="input-money"><span>$</span><input inputMode="numeric" value={x.precio} placeholder="0"
             onChange={(e) => poner({ precio: e.target.value })} onBlur={(e) => { const v = parsePesos(e.target.value); if (v != null && Number.isFinite(v)) poner({ precio: pesos(v) }); }} /></span></label>
           <div className="field"><span>Subtotal</span><div className="input" style={{ display: "flex", alignItems: "center", background: "var(--surface-2)" }}><b className="tnum">{ars(entero(x.cantidad) * plata(x.precio))}</b></div></div>
         </div>
@@ -516,7 +429,7 @@ function PasoPago({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: (c:
     <div className="stack">
       <h2>Entrega y plan de pago</h2>
       <div className="grid-2">
-        <label className="field"><span>Entrega prometida</span><input className="input" type="date" value={f.fecha_entrega} onChange={(e) => cambiar({ fecha_entrega: e.target.value })} /></label>
+        <label className="field"><span>Entrega prometida *</span><input className="input" type="date" value={f.fecha_entrega} onChange={(e) => cambiar({ fecha_entrega: e.target.value })} /></label>
         <div className="field"><span>Entrega</span>
           <div className="seg" role="group">
             <button type="button" aria-pressed={f.tipo_entrega === "envio"} onClick={() => cambiar({ tipo_entrega: "envio" })}><Icono n="truck" /> Envío e instalación</button>
@@ -537,11 +450,11 @@ function PasoPago({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: (c:
         return (
           <div key={p.k} className="stack-sm" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-2)" }}>
             <div className="grid-3" style={{ alignItems: "end" }}>
-              <label className="field"><span>Cómo paga</span>
+              <label className="field"><span>Cómo paga *</span>
                 <select className="select" value={p.medio_pago_id} onChange={(e) => pago(n, { medio_pago_id: e.target.value, posnet_plan_id: "" })}>
                   {op.medios.filter((m) => m.tipo !== "credito_casa").map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                 </select></label>
-              <label className="field"><span>Monto</span>{dinero(p.monto, (v) => pago(n, { monto: v }), `Monto del anticipo ${n + 1}`)}</label>
+              <label className="field"><span>Monto *</span>{dinero(p.monto, (v) => pago(n, { monto: v }), `Monto del anticipo ${n + 1}`)}</label>
               {tipo === "transferencia" && op.cuentas.length > 0 && <label className="field"><span>A qué cuenta entró</span>
                 <select className="select" value={p.cuenta_bancaria_id} onChange={(e) => pago(n, { cuenta_bancaria_id: e.target.value })}>
                   {op.cuentas.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
@@ -553,7 +466,8 @@ function PasoPago({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: (c:
                 </select></label>}
             </div>
             <div className="spread">
-              <span className="small muted">{recargo > 0 && plan ? `Con recargo se cobran ${ars(plata(p.monto) + recargo)}${plan.cuotas > 1 ? `: ${plan.cuotas} cuotas de ${ars((plata(p.monto) + recargo) / plan.cuotas)}` : ""}` : ""}</span>
+              <span className="small muted">{recargo > 0 && plan ? `Con recargo se cobran ${ars(plata(p.monto) + recargo)}${plan.cuotas > 1 ? `: ${plan.cuotas} cuotas de ${ars((plata(p.monto) + recargo) / plan.cuotas)}` : ""}`
+                : tipo === "efectivo" ? (op.caja_abierta ? "Entra a la caja abierta." : "La caja está cerrada: entra a la próxima que se abra.") : ""}</span>
               {f.pagos.length > 1 && <button type="button" className="btn btn-sm btn-ghost" onClick={() => cambiar({ pagos: f.pagos.filter((_, j) => j !== n) })}><Icono n="trash" />Quitar</button>}
             </div>
           </div>
@@ -567,7 +481,7 @@ function PasoPago({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: (c:
           <span>Paga el resto en cuotas (crédito de la casa){c.total - c.anticipo > 0 && <>: <b className="tnum">{ars(c.total - c.anticipo)}</b></>}</span></label>
         {f.financia && (
           <div className="grid-3">
-            <label className="field"><span>Cantidad de cuotas</span><input className="input" inputMode="numeric" value={f.credito.cuotas} onChange={(e) => credito({ cuotas: e.target.value.replace(/\D/g, "") })} /></label>
+            <label className="field"><span>Cantidad de cuotas *</span><input className="input" inputMode="numeric" value={f.credito.cuotas} onChange={(e) => credito({ cuotas: e.target.value.replace(/\D/g, "") })} /></label>
             <label className="field"><span>Valor de cada cuota</span>
               <span className="input-money"><span>$</span><input inputMode="numeric" value={f.credito.monto_cuota} placeholder={c.financiado && c.cuotas ? pesos(Math.ceil(c.financiado / c.cuotas)) : "0"}
                 onChange={(e) => credito({ monto_cuota: e.target.value })} onBlur={(e) => { const v = parsePesos(e.target.value); if (v != null && Number.isFinite(v)) credito({ monto_cuota: pesos(v) }); }} /></span>
@@ -576,7 +490,7 @@ function PasoPago({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: (c:
               <select className="select" value={f.credito.frecuencia_cuotas} onChange={(e) => credito({ frecuencia_cuotas: e.target.value as Frecuencia | "" })}>
                 <option value="">—</option>{Object.entries(FRECUENCIA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select></label>
-            <label className="field"><span>Fecha de inicio</span><input className="input" type="date" value={f.credito.fecha_primer_vencimiento} onChange={(e) => credito({ fecha_primer_vencimiento: e.target.value })} /><small>Cuándo vence la primera cuota.</small></label>
+            <label className="field"><span>Fecha de inicio *</span><input className="input" type="date" value={f.credito.fecha_primer_vencimiento} onChange={(e) => credito({ fecha_primer_vencimiento: e.target.value })} /><small>Cuándo vence la primera cuota.</small></label>
             <label className="field"><span>Crédito Nº (opcional)</span><input className="input" value={f.credito.referencia} onChange={(e) => credito({ referencia: e.target.value })} /></label>
           </div>
         )}

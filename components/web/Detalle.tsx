@@ -1,10 +1,10 @@
 "use client";
-// Lo que se abre al tocar un modelo o un trabajo: galería con video y foto ampliada, medidas dibujadas, preguntas y WhatsApp.
+// Lo que se abre al tocar un modelo, un trabajo o un color: galería con video y foto ampliada, medidas dibujadas, preguntas y WhatsApp.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { media } from "@/lib/api";
-import type { TrabajoWeb } from "@/lib/tipos";
-import { etiquetas, mensajeDe, precioTexto, tieneMedidas, tituloTrabajo, type Catalogo, type Modelo } from "@/lib/web";
-import { BTN_CERRAR, BTN_ORO_CTA, CONTADOR, Calculadora, Diapositivas, EYEBROW, FILA, Foto, I, MEDIA, MarcaFondo, TICKS, Tarjeta, useAcciones } from "./ui";
+import type { ColorWeb, TrabajoWeb } from "@/lib/tipos";
+import { etiquetas, mensajeColor, mensajeDe, precioTexto, tieneMedidas, tituloTrabajo, type Catalogo, type Modelo } from "@/lib/web";
+import { BTN_CERRAR, BTN_ORO_CTA, CONTADOR, Calculadora, Diapositivas, EYEBROW, FILA, FLECHA, Foto, I, LINK, MEDIA, MarcaFondo, Muestra, TICKS, Tarjeta, useAcciones } from "./ui";
 
 const PRINCIPAL = "grid gap-5 pt-3 px-(--gutter) [&>*]:min-w-0 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pt-7 lg:px-8 lg:items-start";
 // En notebooks bajas la galería se achica para que sus miniaturas entren en pantalla
@@ -208,7 +208,7 @@ function Pregunta({ titulo, abierta, children }: { titulo: string; abierta?: boo
 }
 
 export function DetalleModelo({ p, cat }: { p: Modelo; cat: Catalogo }) {
-  const { wa } = useAcciones();
+  const { wa, irColores } = useAcciones();
   const r = cat.R[p.ambiente], chips = etiquetas(p), precio = precioTexto(p.precio);
   const relacionados = cat.P.filter((x) => x.ambiente === p.ambiente && x.id !== p.id && x.fotos.length)
     .sort((a, b) => +(b.tipo === p.tipo) - +(a.tipo === p.tipo) || b.fotos.length - a.fotos.length).slice(0, 10);
@@ -258,8 +258,9 @@ export function DetalleModelo({ p, cat }: { p: Modelo; cat: Catalogo }) {
               {p.nota && <p>{p.nota.replace(/^\w/, (m) => m.toUpperCase())}.</p>}
               {!p.caracteristicas.length && !p.nota && <p>Consultanos cuántos cajones, estantes y qué herrajes querés: lo armamos a tu gusto.</p>}
             </Pregunta>
-            <Pregunta titulo="Materiales y colores">
+            <Pregunta titulo="Materiales y colores" abierta={cat.colores.length > 0}>
               <p>Lo hacemos en melamina o MDF. Elegís el color y la combinación, y en el showroom de Lomas de Tafí podés ver las muestras.</p>
+              {cat.colores.length > 0 && <button className={`${LINK} justify-self-start`} onClick={irColores}>Ver los {cat.colores.length} colores {FLECHA}</button>}
             </Pregunta>
             <Pregunta titulo="Envío e instalación">
               <p>Lo llevamos y lo instalamos en toda la provincia de Tucumán. Te confirmamos la fecha con el presupuesto.</p>
@@ -306,5 +307,50 @@ export function DetalleTrabajo({ t }: { t: TrabajoWeb }) {
         <div className={CTA}><a className={BTN_ORO_CTA} target="_blank" rel="noopener" href={wa(`Hola! Vi el trabajo ${t.titulo} en la web y quiero algo parecido.`)}><I n="chat" />Quiero algo así</a></div>
       </div>
     </div>
+  );
+}
+
+/* ---------- detalle de un color ---------- */
+
+export function DetalleColor({ c, cat }: { c: ColorWeb; cat: Catalogo }) {
+  const { wa } = useAcciones();
+  const fotos = (c.muestra ? [c.muestra] : []).concat(c.fotos); // primero la muestra, después los ambientes
+  const misma = cat.colores.filter((x) => x.proveedor === c.proveedor && x.linea === c.linea && x.id !== c.id);
+  const datos = [["Proveedor", c.proveedor], ["Línea", c.linea], ["Material", c.material], ["Textura", c.textura], ["Código", c.codigo]]
+    .filter((x): x is [string, string] => !!x[1]);
+  return (
+    <>
+      <div className={PRINCIPAL}>
+        <div className={GALERIA}>
+          <Galeria fotos={fotos} nombre={c.nombre} video={null} />
+        </div>
+        <div className="grid gap-4 content-start">
+          <div>
+            <span className={EYEBROW}>{[c.proveedor, c.linea && `Línea ${c.linea}`].filter(Boolean).join(" · ")}</span>
+            <h2 id="dName" className={TITULO}>{c.nombre}</h2>
+            {c.descripcion && <p className="text-[16px] text-muted mt-1.5">{c.descripcion}</p>}
+          </div>
+          <dl className="grid grid-cols-2 gap-px bg-line rounded-lg overflow-hidden border border-line">
+            {datos.map(([k, v]) => (
+              <div key={k} className="bg-surface py-3 px-4 last:odd:col-span-full">
+                <dt className="text-[11px] tracking-[.12em] uppercase text-muted font-semibold">{k}</dt>
+                {/* el código en la letra del texto: en la de los títulos el 1 parece una I */}
+                <dd className={`leading-[1.25] break-words ${k === "Código" ? "text-[17px] font-semibold tabular-nums mt-0.5" : "font-display text-[20px]"}`}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="flex gap-2 items-start text-[13.5px] text-ink bg-surface-2 rounded-xl py-2.5 px-3" role="note">
+            <I n="info" className="size-[17px] flex-none text-gold-ink mt-px" />En la pantalla el color puede verse distinto. En el showroom de Lomas de Tafí podés ver las muestras.
+          </p>
+          <div className={CTA}><a className={BTN_ORO_CTA} target="_blank" rel="noopener" href={wa(mensajeColor(c))}><I n="chat" />Consultar por este color</a></div>
+        </div>
+      </div>
+      {misma.length > 0 && (
+        <div className="pt-[30px] px-(--gutter) lg:pt-9 lg:px-8">
+          <div className="mb-3.5"><span className={EYEBROW}>Misma línea</span><h2 className="text-[26px] leading-[1.1]">Más de {c.linea}</h2></div>
+          <div className={`${FILA} lg:-mx-8 lg:px-8 lg:scroll-px-8`}>{misma.map((x) => <Muestra key={x.id} c={x} className="flex-[0_0_128px] snap-start sm:basis-[150px]" />)}</div>
+        </div>
+      )}
+    </>
   );
 }
