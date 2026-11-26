@@ -11,6 +11,7 @@ import { CONCEPTO, cuandoEntrega, detalleCobro, direccionTexto, saldo, situacion
 import type { Cobro, OpcionesVenta, Venta } from "@/lib/tipos";
 import { DatosCliente, fila } from "@/components/DatosCliente";
 import { Icono, type NombreIcono } from "@/components/Icono";
+import { BotonMensaje } from "@/components/Mensaje";
 import { Modal } from "@/components/Modal";
 import { useAviso } from "@/components/Avisos";
 
@@ -65,6 +66,11 @@ function VerVenta() {
         <div className="spread">
           <div className="row"><h1 className="tnum">{numeroVenta(v.numero)}</h1><span className={`badge ${s.tono}`}>{s.texto}</span></div>
           <div className="row">
+            <BotonMensaje donde="venta" telefono={tel} valores={() => ({
+              cliente: v.cliente.nombre, venta: numeroVenta(v.numero), total: ars(v.total), entrega: fecha(v.fecha_entrega),
+              muebles: v.items.map((x) => `${x.cantidad > 1 ? `${x.cantidad}× ` : ""}${x.nombre}`).join(", "),
+              saldo: abierta && debe > 0 ? ars(debe) : null,
+            })} />
             <Link className="btn" href={`/admin/ventas/imprimir/?id=${v.id}`}><Icono n="print" />Imprimir ficha</Link>
           </div>
         </div>

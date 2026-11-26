@@ -178,7 +178,7 @@ export function Tarjeta({ p, modo }: { p: Modelo; modo: ModoTarjeta }) {
 export function Muestra({ c, className = "" }: { c: ColorWeb; className?: string }) {
   const { abrirColor } = useAcciones();
   return (
-    <button onClick={() => abrirColor(c)} aria-label={`${c.nombre}${c.linea ? `, línea ${c.linea}` : ""}`}
+    <button onClick={() => abrirColor(c)} aria-label={c.nombre}
       className={`group cursor-pointer grid gap-1.5 content-start text-left min-w-0 focus-visible:outline-offset-[3px] focus-visible:rounded-[10px] ${className}`}>
       <div className={`${MEDIA} aspect-square rounded-xl shadow-[inset_0_0_0_1px_var(--line)]`}>
         <MarcaFondo />

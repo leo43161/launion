@@ -8,6 +8,7 @@ import { useSesion } from "@/lib/sesion";
 import { ars, fechaHora, medidas, mensajeWhatsapp, num, parseArs, precioPresupuesto } from "@/lib/formato";
 import type { Categoria, Producto, ProductoGuardar, TipoPrecio } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
+import { BotonMensaje, valoresModelo } from "@/components/Mensaje";
 import { useAviso } from "@/components/Avisos";
 
 export default function Pagina() {
@@ -181,6 +182,7 @@ function Editar() {
         <div><h1>{titulo}</h1>{guardado?.actualizado_en && <p>Última modificación: {fechaHora(guardado.actualizado_en)}</p>}</div>
         <div className="row">
           <Link className="btn" href="/admin/catalogo/">{cambios ? "Cancelar" : "Volver"}</Link>
+          {guardado && <BotonMensaje valores={() => valoresModelo(guardado, categorias)} />}
           <button className="btn btn-primary" type="button" onClick={guardar} disabled={guardando || !!subiendo}><Icono n="check" />{guardando ? "Guardando…" : "Guardar"}</button>
         </div>
       </div>

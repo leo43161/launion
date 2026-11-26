@@ -5,9 +5,8 @@ import type { AmbienteWeb, ColorWeb, ModeloWeb, Precio, Respuestas, TrabajoWeb }
 export type Publico = "casa" | "negocio";
 export type Modelo = ModeloWeb & { i: number }; // i: posición en el catálogo (el orden en que se cargaron), para desempatar
 export type Ambiente = AmbienteWeb & { n: number; rel: string[] }; // n: modelos visibles; rel: ambientes que combinan
-export type Proveedor = { nombre: string; n: number; lineas: { nombre: string; colores: ColorWeb[] }[] }; // n: colores del proveedor
 export type Catalogo = {
-  P: Modelo[]; ambientes: Ambiente[]; R: Record<string, Ambiente>; trabajos: TrabajoWeb[]; colores: ColorWeb[]; proveedores: Proveedor[]; vendedores: Record<string, string>;
+  P: Modelo[]; ambientes: Ambiente[]; R: Record<string, Ambiente>; trabajos: TrabajoWeb[]; colores: ColorWeb[]; vendedores: Record<string, string>;
 };
 
 export const PUBLICOS: Record<Publico, string> = { casa: "Para tu casa", negocio: "Para tu negocio" };
@@ -43,27 +42,12 @@ export const tituloTrabajo = (t: TrabajoWeb): string => t.titulo.replace(/\s+(\d
 export function armarCatalogo(d: Respuestas["web"]): Catalogo {
   const P = d.modelos.map((m, i) => ({ ...m, i }));
   const ambientes = d.ambientes.map((a) => ({ ...a, n: P.filter((p) => p.ambiente === a.slug).length, rel: RELACIONADOS[a.slug] || [] }));
-  return { P, ambientes, R: Object.fromEntries(ambientes.map((a) => [a.slug, a])), trabajos: d.trabajos, colores: d.colores, proveedores: porProveedor(d.colores), vendedores: d.vendedores };
-}
-
-/** Los colores separados por proveedor y, adentro, por línea, en el orden en que vienen de la API. */
-function porProveedor(colores: ColorWeb[]): Proveedor[] {
-  const out: Proveedor[] = [];
-  for (const c of colores) {
-    const pn = c.proveedor || "Otros", ln = c.linea || "Otros";
-    let p = out.find((x) => x.nombre === pn);
-    if (!p) out.push((p = { nombre: pn, n: 0, lineas: [] }));
-    let l = p.lineas.find((x) => x.nombre === ln);
-    if (!l) p.lineas.push((l = { nombre: ln, colores: [] }));
-    l.colores.push(c);
-    p.n++;
-  }
-  return out;
+  return { P, ambientes, R: Object.fromEntries(ambientes.map((a) => [a.slug, a])), trabajos: d.trabajos, colores: d.colores, vendedores: d.vendedores };
 }
 
 /** El WhatsApp para consultar por un color. */
 export const mensajeColor = (c: ColorWeb): string =>
-  `Hola! Me gustó el color ${c.nombre}${c.proveedor ? ` de ${c.proveedor}` : ""} que vi en la web. Quiero consultar por un mueble en ese color.`;
+  `Hola! Me gustó el color ${c.nombre} que vi en la web. Quiero consultar por un mueble en ese color.`;
 
 export const tieneMedidas = (p: Modelo): boolean => [p.ancho_cm, p.alto_cm, p.profundidad_cm, p.diametro_cm].some((v) => v != null);
 /** Ancho para filtrar y ordenar por medida (o el diámetro). */

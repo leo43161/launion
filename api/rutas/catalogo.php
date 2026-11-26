@@ -23,6 +23,7 @@ function catalogo_listar() {
        p.visible, p.destacado, p.url_video IS NOT NULL AS tiene_video, p.eliminado_en IS NOT NULL AS eliminado,
        (SELECT f.url FROM productos_fotos f WHERE f.producto_id = p.id ORDER BY f.orden LIMIT 1) AS foto,
        (SELECT COUNT(*) FROM productos_fotos f WHERE f.producto_id = p.id) AS fotos, '
+    . precio_vigente_sql(LISTA_WEB) . ' AS precio_web, '
     . (puede('precios.ver') ? precio_vigente_sql(LISTA_LOCAL) : 'NULL') . ' AS precio_local
      FROM productos p ORDER BY p.creado_en, p.nombre')->fetchAll();
   salir(['categorias' => $categorias, 'productos' => $productos]);

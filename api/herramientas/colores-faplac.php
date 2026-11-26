@@ -5,8 +5,8 @@
 
    De cada color: nombre, código, línea y textura (los filtros del listado), la descripción de su ficha, la muestra y las fotos
    de ambientes. Las revestimientos y fondos de Faplac son los mismos diseños: no se traen.
-   Se puede volver a correr cuando Faplac saque diseños nuevos: el .sql agrega los nuevos y actualiza los que ya están
-   (no les cambia visible ni activo, que se eligen acá). */
+   Ya no se vuelve a correr: los colores se cargan y ordenan desde el panel (/admin/colores/), y el .sql pisaría el orden,
+   el código, la textura, la descripción y las fotos que cargaron ellos. */
 
 if (PHP_SAPI !== 'cli') exit;
 [, $destino, $carpeta_fotos] = $argv + [null, null, null];

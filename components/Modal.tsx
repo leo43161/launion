@@ -16,6 +16,7 @@ export function Modal({ titulo, children, pie, ancho = false, alCerrar }: Props)
   const id = useId();
   useEffect(() => {
     const previo = document.activeElement as HTMLElement | null;
+    const scroll = document.body.style.overflow; // con una ventana adentro de otra, al cerrar la de arriba la página sigue quieta
     document.body.style.overflow = "hidden";
     const t = setTimeout(() => {
       if (raiz.current?.contains(document.activeElement)) return; // un campo con autoFocus ya lo tiene
@@ -23,12 +24,12 @@ export function Modal({ titulo, children, pie, ancho = false, alCerrar }: Props)
     }, 30);
     return () => {
       clearTimeout(t);
-      document.body.style.overflow = "";
+      document.body.style.overflow = scroll;
       previo?.focus?.({ preventScroll: true });
     };
   }, []);
   return (
-    <div className="modal-root" ref={raiz} onKeyDown={(e) => e.key === "Escape" && alCerrar()}>
+    <div className="modal-root" ref={raiz} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); alCerrar(); } }}>
       <div className="modal-scrim" onClick={alCerrar} />
       <div className={`modal ${ancho ? "wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id}>
         <div className="modal-head">

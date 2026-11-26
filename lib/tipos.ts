@@ -46,6 +46,7 @@ export interface ProductoFila extends Medidas {
   eliminado: Bit;
   foto: string | null;
   fotos: number;
+  precio_web: Monto | null; // el monto: el fijo, o el mínimo si es "desde" o rango
   precio_local: Monto | null; // null sin el permiso precios.ver
 }
 
@@ -124,6 +125,33 @@ export interface VendedorGuardar {
   nombre: string;
   link_web: string;
   telefono: string;
+}
+
+/* ---------- colores de la web (catalogo.editar) ---------- */
+
+/** Un color en el panel. visible = en stock: el que no está, no se ve en la web. codigo: el del proveedor, para pedirlo (la web no lo muestra). */
+export interface Color {
+  id: number;
+  nombre: string;
+  material_id: number | null;
+  textura: string | null;
+  codigo: string | null;
+  descripcion: string | null;
+  muestra: string | null; // foto de la textura
+  fotos: string[]; // muebles o ambientes con el color
+  visible: Bit;
+}
+
+/** Lo que recibe color/guardar. Sin id = color nuevo: queda primero. */
+export type ColorGuardar = Omit<Color, "id" | "visible"> & { id?: number; visible: boolean };
+
+/* ---------- plantillas de mensajes de WhatsApp (las usa cualquiera; editarlas: catalogo.editar) ---------- */
+
+/** texto: con variables entre llaves ({nombre}, {precio}…), que completa lib/plantillas.ts. */
+export interface Plantilla {
+  id: number;
+  nombre: string;
+  texto: string;
 }
 
 /* ---------- presupuestos de fabricación ---------- */
@@ -581,13 +609,10 @@ export interface TrabajoWeb {
   fotos: string[];
 }
 
-/** Color de un proveedor (Faplac…), para la página Colores. muestra: la foto de la textura; fotos: muebles o ambientes con el color. */
+/** Color en stock, para la página Colores (sin proveedor: la web no los nombra). muestra: la foto de la textura; fotos: muebles o ambientes con el color. */
 export interface ColorWeb {
   id: number;
-  proveedor: string | null;
-  linea: string | null;
   nombre: string;
-  codigo: string | null;
   material: string | null; // Melamina, Polímero…
   textura: string | null;
   descripcion: string | null;
@@ -604,6 +629,14 @@ export interface Respuestas {
   producto: { producto: Producto };
   "producto/guardar": { id: number };
   "producto/estado": { ok: true };
+  colores: { colores: Color[]; materiales: { id: number; nombre: string }[] }; // colores en el orden de la web
+  "color/guardar": Respuestas["colores"];
+  "color/estado": { ok: true };
+  "colores/orden": { ok: true };
+  "precios/modelos": { cambiados: number }; // precios cambiados (un modelo con web y local cuenta 2)
+  "precios/presupuestos": { cambiados: number };
+  plantillas: { plantillas: Plantilla[] }; // en orden
+  "plantillas/guardar": { plantillas: Plantilla[] };
   vendedores: { vendedores: Vendedor[] };
   "vendedores/guardar": { vendedores: Vendedor[] };
   presupuestos: { presupuestos: PresupuestoFila[]; insumos: { insumo: string; costo_unitario: Monto }[] }; // insumos: el último costo de cada uno
@@ -648,6 +681,13 @@ export interface Pedidos {
   "auth/clave": { actual: string; nueva: string };
   "producto/guardar": ProductoGuardar;
   "producto/estado": { id: number; visible?: Bit; eliminado?: Bit };
+  "color/guardar": ColorGuardar;
+  "color/estado": { id: number; visible: Bit };
+  "colores/orden": { ids: number[] };
+  "plantillas/guardar": { plantillas: (Omit<Plantilla, "id"> & { id?: number })[] }; // la lista entera: la que no viene se borra
+  // Subir precios en bloque: porcentaje 10 = × 1,10; redondear: para arriba a $ 1.000 (si no, a pesos enteros)
+  "precios/modelos": { ids: number[]; porcentaje: number; redondear: boolean; listas: ("web" | "local")[] };
+  "precios/presupuestos": { ids: number[]; porcentaje: number; redondear: boolean };
   "vendedores/guardar": { vendedores: VendedorGuardar[] };
   "presupuesto/guardar": PresupuestoGuardar;
   "presupuesto/eliminar": { id: number };

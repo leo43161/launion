@@ -1,18 +1,22 @@
 "use client";
 // Presupuestos de fabricación: lo que antes era la planilla de Excel. Buscar por nombre o grupo; tocar uno lo abre.
+// El botón de WhatsApp de cada uno manda una plantilla con su precio (components/Mensaje.tsx).
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, media } from "@/lib/api";
+import { useSesion } from "@/lib/sesion";
 import { ars, fechaHora, norm, precioPresupuesto } from "@/lib/formato";
 import type { PresupuestoFila } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
+import { BotonMensaje, valoresPresupuesto } from "@/components/Mensaje";
 
 const FILTROS = "lu-presupuestos-filtros"; // se guardan al abrir uno y volver
 
 
 export default function Presupuestos() {
   const router = useRouter();
+  const { puede } = useSesion();
   const [lista, setLista] = useState<PresupuestoFila[] | null>(null);
   const [error, setError] = useState("");
   const [f, setF] = useState({ q: "", grupo: "" });
@@ -41,7 +45,10 @@ export default function Presupuestos() {
       <title>Presupuestos · La Unión</title>
       <div className="page-head">
         <div><h1>Presupuestos</h1><p>El costo de fabricar cada mueble y su precio: despiece, insumos y precio final.</p></div>
-        <Link className="btn btn-primary" href="/admin/presupuestos/editar/"><Icono n="plus" />Nuevo presupuesto</Link>
+        <div className="row">
+          {puede("catalogo.editar") && <Link className="btn" href="/admin/precios/?de=presupuestos"><Icono n="up" />Subir precios</Link>}
+          <Link className="btn btn-primary" href="/admin/presupuestos/editar/"><Icono n="plus" />Nuevo presupuesto</Link>
+        </div>
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 14, padding: 12 }}>
@@ -64,7 +71,7 @@ export default function Presupuestos() {
         : !filas.length ? <div className="empty"><Icono n="search" /><p>No hay presupuestos con estos filtros.</p></div>
         : (
           <div className="table-wrap"><table className="table cards">
-            <thead><tr><th style={{ width: 56 }}></th><th>Mueble</th><th className="num">Costo</th><th className="num">Precio</th><th className="num">Precio final</th><th>Modificado</th></tr></thead>
+            <thead><tr><th style={{ width: 56 }}></th><th>Mueble</th><th className="num">Costo</th><th className="num">Precio</th><th className="num">Precio final</th><th>Modificado</th><th><span className="sr">WhatsApp</span></th></tr></thead>
             <tbody>
               {filas.map((p) => (
                 <tr key={p.id} className="click" onClick={() => router.push(`/admin/presupuestos/editar/?id=${p.id}`)}>
@@ -77,6 +84,7 @@ export default function Presupuestos() {
                   <td data-label={`Precio (× ${String(Number(p.multiplicador)).replace(".", ",")})`} className="num">{ars(precioPresupuesto(p.costo, p.multiplicador))}</td>
                   <td data-label="Precio final" className="num"><b>{p.precio_final ? ars(p.precio_final) : <span className="muted">—</span>}</b></td>
                   <td data-label="Modificado"><span className="small muted">{fechaHora(p.actualizado_en)}</span></td>
+                  <td className="right" onClick={(e) => e.stopPropagation()}><BotonMensaje solo donde="presupuesto" valores={() => valoresPresupuesto(p)} /></td>
                 </tr>
               ))}
             </tbody>

@@ -192,9 +192,9 @@ function Lateral({ cat, e, enCajon, hecho, irAmbiente, irPublico, irInicio, irCo
           <h4 className={H4}>Colores</h4>
           <button aria-current={e.vista === "colores"} onClick={() => { hecho?.(); irColores(); }} className={BTN_LATERAL}>
             <span className="size-[46px] rounded-[10px] overflow-hidden bg-surface-2 flex-none grid grid-cols-2">
-              {cat.proveedores.flatMap((p) => p.lineas.map((l) => l.colores[0])).slice(0, 4).map((c) => c.muestra && <Foto key={c.id} src={c.muestra} alt="" className="w-full h-full object-cover" />)}
+              {cat.colores.slice(0, 4).map((c) => c.muestra && <Foto key={c.id} src={c.muestra} alt="" className="w-full h-full object-cover" />)}
             </span>
-            <span className="text-[15px] font-semibold leading-[1.25]">Colores y texturas<small className="block font-medium text-[12.5px] text-muted">{cat.colores.length} colores · {cat.proveedores.map((p) => p.nombre).join(", ")}</small></span>
+            <span className="text-[15px] font-semibold leading-[1.25]">Colores y texturas<small className="block font-medium text-[12.5px] text-muted">{cat.colores.length} colores</small></span>
           </button>
         </div>
       )}
@@ -252,7 +252,6 @@ export default function Web() {
   const [navOculta, setNavOculta] = useState(false); // celular: el encabezado se va al bajar y quedan dos botones flotantes
   const [pista, setPista] = useState(false); // "Decime lo que estás buscando" al lado de la lupa
   const [grupo, setGrupo] = useState<string>(GRUPOS_TRABAJO[0][0]);
-  const [lineaDe, setLineaDe] = useState<Record<string, string>>({}); // Colores: la línea elegida de cada proveedor ("" o nada = todas)
   const caja = useRef<HTMLDivElement>(null), btnCerrar = useRef<HTMLButtonElement>(null), centinela = useRef<HTMLDivElement>(null);
   const q2 = useRef<HTMLInputElement>(null), galeria = useRef<HTMLDivElement>(null);
   const foco = useRef<HTMLElement | null>(null), avisoT = useRef(0);
@@ -409,7 +408,7 @@ export default function Web() {
       chicos: P.filter((p) => R[p.ambiente].publico === "casa" && (anchoDe(p) ?? 61) <= 60 && p.fotos.length).slice(0, 3),
       led: P.filter((p) => R[p.ambiente].publico === "casa" && esLed(p) && p.fotos.length).sort(porFotos).slice(0, 10),
       negocios: ["kiosco", "local", "panaderia", "unas", "ropa", "oficina"].flatMap((r) => P.filter((p) => p.ambiente === r && p.fotos.length).sort(porFotos).slice(0, 2)),
-      colores: cat.proveedores.flatMap((p) => p.lineas.flatMap((l) => l.colores.slice(0, 2))), // dos de cada línea
+      colores: cat.colores.slice(0, 16), // los primeros, en el orden que eligen en el panel
     };
   }, [cat]);
 
@@ -784,7 +783,7 @@ export default function Web() {
             </div>
           </div>
 
-          {/* ---------- COLORES: separados por proveedor y, adentro, por línea ---------- */}
+          {/* ---------- COLORES: los que están en stock, en el orden del panel ---------- */}
           <div hidden={e.vista !== "colores" || !cat}>
             {cat && (
               <div className={WRAP_P}>
@@ -793,7 +792,7 @@ export default function Web() {
                 </nav>
                 <div className="grid gap-1.5 mt-2.5 mb-3.5">
                   <h1 className="text-[clamp(30px,7.6vw,52px)] leading-[1.05]">Colores</h1>
-                  <p className="text-muted max-w-[58ch]">Los colores y texturas con los que fabricamos tu mueble, de cada proveedor. Tocá uno para verlo de cerca y en un ambiente.</p>
+                  <p className="text-muted max-w-[58ch]">Los colores y texturas con los que fabricamos tu mueble. Tocá uno para verlo de cerca y en un ambiente.</p>
                   <a className={`${BTN_SM} justify-self-start mt-1`} target="_blank" rel="noopener"
                     href={`https://wa.me/?text=${encodeURIComponent(`Colores · La Unión Muebles\n${location.origin}${location.pathname.replace(/colores\/?$/, "")}?catalogo=colores`)}`}>
                     <I n="wa" />Compartir por WhatsApp
@@ -805,38 +804,14 @@ export default function Web() {
                     <a className={BTN_ORO} target="_blank" rel="noopener" href={wa("Hola! Quiero ver los colores para mi mueble.")}><I n="chat" />Consultar por WhatsApp</a>
                   </div>
                 )}
-                {cat.proveedores.map((pr, k) => {
-                  const sel = lineaDe[pr.nombre];
-                  return (
-                    <section key={pr.nombre} className={k ? "pt-6 mt-9 border-t border-line" : "mt-6"} aria-label={`Colores de ${pr.nombre}`}>
-                      <div className="flex justify-between items-end gap-3 mb-3">
-                        <div><span className={EYEBROW}>Proveedor</span><h2 className="text-[clamp(26px,6.4vw,38px)] leading-[1.1] mt-1">{pr.nombre}</h2></div>
-                        <span className="text-[13.5px] text-muted tabular-nums">{pr.n} colores</span>
-                      </div>
-                      {pr.lineas.length > 1 && (
-                        <div className={CHIPS} role="group" aria-label={`Líneas de ${pr.nombre}`}>
-                          <button className={CHIP_BTN} aria-pressed={!sel} onClick={() => setLineaDe((x) => ({ ...x, [pr.nombre]: "" }))}>Todas</button>
-                          {pr.lineas.map((l) => (
-                            <button key={l.nombre} className={CHIP_BTN} aria-pressed={sel === l.nombre} onClick={() => setLineaDe((x) => ({ ...x, [pr.nombre]: l.nombre }))}>{l.nombre}</button>
-                          ))}
-                        </div>
-                      )}
-                      {pr.lineas.filter((l) => !sel || l.nombre === sel).map((l) => (
-                        <div key={l.nombre} className="mt-6">
-                          <div className="flex items-baseline gap-x-2.5 flex-wrap mb-3">
-                            <h3 className="text-[22px] leading-[1.15]">Línea {l.nombre}</h3>
-                            <span className="text-[13px] text-muted">{l.colores.length} {l.colores.length === 1 ? "color" : "colores"}{l.colores[0].material ? ` · ${l.colores[0].material}` : ""}</span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-x-2.5 gap-y-4 sm:grid-cols-4 lg:grid-cols-6">{l.colores.map((c) => <Muestra key={c.id} c={c} />)}</div>
-                        </div>
-                      ))}
-                    </section>
-                  );
-                })}
                 {cat.colores.length > 0 && (
-                  <p className="flex gap-2 items-start text-[13.5px] text-ink bg-surface-2 rounded-xl py-2.5 px-3 mt-9" role="note">
-                    <I n="info" className="size-[17px] flex-none text-gold-ink mt-px" />Las fotos son de cada proveedor y en la pantalla el color puede verse distinto. En el showroom de Lomas de Tafí podés ver las muestras.
-                  </p>
+                  <>
+                    <p className="text-[13.5px] text-muted tabular-nums mt-6 mb-3">{cat.colores.length} colores</p>
+                    <div className="grid grid-cols-3 gap-x-2.5 gap-y-4 sm:grid-cols-4 lg:grid-cols-6">{cat.colores.map((c) => <Muestra key={c.id} c={c} />)}</div>
+                    <p className="flex gap-2 items-start text-[13.5px] text-ink bg-surface-2 rounded-xl py-2.5 px-3 mt-9" role="note">
+                      <I n="info" className="size-[17px] flex-none text-gold-ink mt-px" />En la pantalla el color puede verse distinto. En el showroom de Lomas de Tafí podés ver las muestras.
+                    </p>
+                  </>
                 )}
               </div>
             )}

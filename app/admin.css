@@ -119,6 +119,10 @@ p { margin: 0; }
 .btn-dark { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .btn-ghost { background: transparent; border-color: transparent; }
 .btn-ghost:hover { background: var(--surface-2); border-color: transparent; }
+/* WhatsApp (components/Mensaje.tsx): un verde más oscuro que el de la marca, para que el texto blanco se lea (contraste 5:1) */
+.btn-wa { background: #168043; border-color: #168043; color: #fff; }
+.btn-wa:hover { background: #11693a; border-color: #11693a; }
+.btn-wa.solo { width: var(--h); padding: 0; }
 .btn-danger { color: var(--bad); }
 .btn-danger:hover { border-color: var(--bad); }
 .btn-sm { --h: 32px; padding: 0 10px; font-size: 13px; }

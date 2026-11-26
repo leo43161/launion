@@ -44,9 +44,8 @@ function web_catalogo() {
   $vendedores = consulta('SELECT e.link_web, t.numero_completo FROM empleados e
     JOIN telefonos t ON t.persona_id = e.persona_id AND t.es_principal = 1 WHERE e.link_web IS NOT NULL')->fetchAll(PDO::FETCH_KEY_PAIR);
 
-  // Colores: la página Colores los separa por proveedor y línea, en este orden
-  $colores = consulta('SELECT c.id, c.proveedor, c.linea, c.nombre, c.codigo_proveedor AS codigo, m.nombre AS material, c.textura,
-      c.descripcion, c.url_imagen AS muestra, c.fotos
+  // Colores: los que están en stock, en el orden que eligen en el panel. Sin proveedor, línea ni código: no se nombra a los proveedores
+  $colores = consulta('SELECT c.id, c.nombre, m.nombre AS material, c.textura, c.descripcion, c.url_imagen AS muestra, c.fotos
     FROM colores c LEFT JOIN materiales m ON m.id = c.material_id
     WHERE c.visible = 1 AND c.activo = 1 ORDER BY c.orden, c.id')->fetchAll();
   foreach ($colores as &$c) $c['fotos'] = json_decode($c['fotos'] ?? '[]', true) ?: [];

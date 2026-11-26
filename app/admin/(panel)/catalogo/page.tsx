@@ -1,13 +1,15 @@
 "use client";
 // Catálogo: buscar, filtrar, mostrar u ocultar en la web, eliminar y restaurar. Tocar un modelo lo abre para editar.
+// El botón de WhatsApp de cada uno manda una plantilla con sus datos (components/Mensaje.tsx).
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, media } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
 import { ars, medidas, norm } from "@/lib/formato";
-import type { Pedidos, Producto, ProductoFila, Respuestas } from "@/lib/tipos";
+import type { Categoria, Pedidos, Producto, ProductoFila, Respuestas } from "@/lib/tipos";
 import { Icono } from "@/components/Icono";
+import { BotonMensaje, valoresModelo } from "@/components/Mensaje";
 import { Modal } from "@/components/Modal";
 import { useAviso } from "@/components/Avisos";
 
@@ -84,7 +86,12 @@ export default function Catalogo() {
       <title>Catálogo · La Unión</title>
       <div className="page-head">
         <div><h1>Catálogo</h1><p>{editar ? "Lo que cambies acá es lo que va a mostrar la web pública." : "Consultá modelos, medidas y fotos."}</p></div>
-        {editar && <Link className="btn btn-primary" href="/admin/catalogo/editar/"><Icono n="plus" />Nuevo modelo</Link>}
+        {editar && (
+          <div className="row">
+            <Link className="btn" href="/admin/precios/"><Icono n="up" />Subir precios</Link>
+            <Link className="btn btn-primary" href="/admin/catalogo/editar/"><Icono n="plus" />Nuevo modelo</Link>
+          </div>
+        )}
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 14, padding: 12 }}>
@@ -118,7 +125,7 @@ export default function Catalogo() {
         : !lista.length ? <div className="empty"><Icono n="search" /><p>No hay modelos con estos filtros.</p></div>
         : (
           <div className="table-wrap"><table className="table cards">
-            <thead><tr><th style={{ width: 56 }}></th><th>Modelo</th><th>Ambiente</th><th>Medidas</th><th>Fotos</th>{precios && <th>Precio local</th>}{editar && <th>En la web</th>}</tr></thead>
+            <thead><tr><th style={{ width: 56 }}></th><th>Modelo</th><th>Ambiente</th><th>Medidas</th><th>Fotos</th>{precios && <th>Precio local</th>}<th><span className="sr">WhatsApp</span></th>{editar && <th>En la web</th>}</tr></thead>
             <tbody>
               {lista.slice(0, mostrar).map((p) => (
                 <tr key={p.id} className={p.eliminado ? "" : "click"} onClick={() => !p.eliminado && abrir(p)}>
@@ -131,6 +138,8 @@ export default function Catalogo() {
                   <td data-label="Medidas"><span className="small tnum">{medidas(p)}</span></td>
                   <td data-label="Fotos">{p.fotos ? <span className="tnum">{p.fotos}</span> : <span className="badge warn">Sin fotos</span>}</td>
                   {precios && <td data-label="Precio local">{p.precio_local ? <span className="tnum">{ars(p.precio_local)}</span> : <span className="muted">—</span>}</td>}
+                  <td onClick={(e) => e.stopPropagation()}>{!p.eliminado && <BotonMensaje solo
+                    valores={() => api("producto", { query: { id: String(p.id) } }).then((r) => valoresModelo(r.producto, categorias))} />}</td>
                   {editar && (
                     <td className="right nowrap" onClick={(e) => e.stopPropagation()}>
                       {p.eliminado ? (
@@ -165,18 +174,18 @@ export default function Catalogo() {
           <p>¿Eliminar “{aEliminar.nombre}”? Deja de verse en la web. Se puede restaurar desde “Ver eliminados”.</p>
         </Modal>
       )}
-      {aVer && <VerModelo fila={aVer} precios={precios} alCerrar={() => setAVer(null)} />}
+      {aVer && <VerModelo fila={aVer} precios={precios} categorias={categorias} alCerrar={() => setAVer(null)} />}
     </>
   );
 }
 
 /** Para quien no edita el catálogo (taller, vendedores): la ficha del modelo. */
-function VerModelo({ fila, precios, alCerrar }: { fila: ProductoFila; precios: boolean; alCerrar: () => void }) {
+function VerModelo({ fila, precios, categorias, alCerrar }: { fila: ProductoFila; precios: boolean; categorias: Categoria[]; alCerrar: () => void }) {
   const [p, setP] = useState<Producto | null>(null);
   const [error, setError] = useState("");
   useEffect(() => { api("producto", { query: { id: String(fila.id) } }).then((r) => setP(r.producto), (e: Error) => setError(e.message)); }, [fila.id]);
   return (
-    <Modal titulo={fila.nombre} ancho alCerrar={alCerrar}>
+    <Modal titulo={fila.nombre} ancho alCerrar={alCerrar} pie={p && <BotonMensaje valores={() => valoresModelo(p, categorias)} />}>
       {error ? <p>{error}</p> : !p ? <p className="muted">Cargando…</p> : (
         <div className="cat-form">
           <div className="photo-grid">

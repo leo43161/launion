@@ -79,6 +79,12 @@ export const parseDec = (s: string): number | null => {
 };
 /** Presupuestos: precio = costo × multiplicador, al centavo. */
 export const precioPresupuesto = (costo: number | Monto, multiplicador: number | Monto): number => Math.round(Number(costo) * Number(multiplicador) * 100) / 100;
+/** Subir precios en bloque: el precio × (1 + porcentaje / 100), redondeado para arriba a $ 1.000 (como "Usar" del presupuesto)
+ *  o a pesos enteros. Primero al centavo: 850.000 × 1,1 da 935.000,0000001 y sin eso subiría a 936.000. Igual que precio_subido() en la API. */
+export function subirPrecio(monto: number | Monto, porcentaje: number, redondear: boolean): number {
+  const v = Math.round(Number(monto) * (1 + porcentaje / 100) * 100) / 100;
+  return redondear ? Math.ceil(v / 1000) * 1000 : Math.round(v);
+}
 
 const NP = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 /** Pesos con centavos si los tiene, sin "$": 77000 → "77.000", 12.5 → "12,5". */

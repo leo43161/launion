@@ -13,6 +13,7 @@ import type { Cliente, NotaCliente, OpcionesVenta, Respuestas } from "@/lib/tipo
 import { DatosCliente } from "@/components/DatosCliente";
 import { CamposCliente, CamposComercio, aClienteForm, clientePedido, faltanCliente, faltanComercio, type ClienteForm } from "@/components/FormCliente";
 import { Icono } from "@/components/Icono";
+import { BotonMensaje } from "@/components/Mensaje";
 import { Modal } from "@/components/Modal";
 import { useAviso } from "@/components/Avisos";
 
@@ -83,6 +84,7 @@ function FichaCliente() {
           <div className="row">
             <button type="button" className="btn" onClick={() => setEditar(true)}><Icono n="edit" />Editar datos</button>
             {wa && <a className="btn" href={`https://wa.me/${wa}?text=${encodeURIComponent(`Hola ${c.nombre}, te escribimos de La Unión.`)}`} target="_blank" rel="noopener"><Icono n="chat" />WhatsApp</a>}
+            <BotonMensaje donde="cliente" telefono={wa} valores={() => ({ cliente: c.nombre, saldo: debe > 0 ? ars(debe) : null })} />
             <Link className="btn btn-primary" href={`/admin/ventas/nueva/?cliente=${c.id}`}><Icono n="plus" />Nueva venta</Link>
           </div>
         </div>
