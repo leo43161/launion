@@ -54,7 +54,13 @@ assert.equal(armarMensaje(planes, { precio: "$ 500.000 a $ 600.000" }), "🔥 $ 
 assert.equal(armarMensaje(planes, { precio: "$529.999" }),
   "🔥 $529.999\n\n💰 50% + 3 SEMANAS\n✔️ Entrega: $ 265.000 y 3 semanas de $ 95.400\n\n💳 TARJETA\n💳 3 cuotas: $ 210.233");
 assert.equal(armarMensaje("{saldo /3}", { saldo: "$ 400.000" }), "$ 133.334");
-assert.equal(armarMensaje("Cuotas: {precio +25% /6}", { precio: null }), ""); // sin precio, el renglón se saca
+// Si TODO el mensaje quedaría vacío (una plantilla toda de {precio} y el mueble sin ningún precio), se dejan los textos con las
+// variables en blanco, listo para escribir los precios a mano y mandarlo
+assert.equal(armarMensaje("Cuotas: {precio +25% /6}", { precio: null }), "Cuotas: ");
+assert.equal(armarMensaje("💰 PRECIO {precio}\n\n➡️ 6 semanas de {precio +25% /6}\n➡️ 10 semanas de {precio +40% /10}", { precio: null }),
+  "💰 PRECIO \n\n➡️ 6 semanas de \n➡️ 10 semanas de ");
+// Pero si queda algo (otro bloque con datos), el bloque de cuotas sin precio sí se saca, como antes
+assert.equal(armarMensaje("✨ {NOMBRE}\n\n💳 3 cuotas: {precio +19% /3}", { nombre: "Cómoda", precio: null }), "✨ CÓMODA");
 assert.equal(armarMensaje("{codigo 50%} {precio +x}", { codigo: "05-147", precio: "$ 1" }), "05-147 {precio +x}"); // sin cuentas o mal escritas
 
 // Dónde sale cada plantilla: donde se completan todas sus variables

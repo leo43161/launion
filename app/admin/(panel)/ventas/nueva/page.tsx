@@ -90,9 +90,9 @@ function faltan(paso: Paso, f: Form, op: OpcionesVenta): string[] {
   const e: string[] = [];
   if (paso === "cliente") {
     if (!f.vendedor_id) e.push("el vendedor");
-    e.push(...faltanCliente(f));
+    e.push(...faltanCliente(f, true));
   }
-  if (paso === "comercio") e.push(...faltanComercio(f));
+  if (paso === "comercio") e.push(...faltanComercio(f, true));
   if (paso === "muebles" && !f.items.length) e.push("al menos un mueble");
   if (paso === "pago") {
     const c = cuentas(f, op);
@@ -311,7 +311,7 @@ function PasoCliente({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar: 
         </div>
       )}
 
-      <CamposCliente d={f} op={op} cambiar={cambiar} />
+      <CamposCliente d={f} op={op} cambiar={cambiar} estricto />
     </div>
   );
 }
@@ -322,7 +322,7 @@ function PasoComercio({ f, op, cambiar }: { f: Form; op: OpcionesVenta; cambiar:
   return (
     <div className="stack">
       <div><h2>Datos comerciales</h2><p className="muted small">El cliente compra para su negocio.</p></div>
-      <CamposComercio d={f} op={op} cambiar={cambiar} />
+      <CamposComercio d={f} op={op} cambiar={cambiar} estricto />
     </div>
   );
 }
@@ -372,6 +372,7 @@ function EditarMueble({ inicial, alGuardar, alCerrar }: { inicial: Item; alGuard
   }
   function listo() {
     if (!x.nombre.trim()) return setError("Escribí qué se fabrica.");
+    if (!x.codigo.trim()) return setError("Poné el código del mueble.");
     if (!x.descripcion.trim()) return setError("Escribí la descripción: medidas, materiales y colores.");
     if (entero(x.cantidad) < 1) return setError("La cantidad tiene que ser 1 o más.");
     const p = parsePesos(x.precio);
@@ -389,7 +390,7 @@ function EditarMueble({ inicial, alGuardar, alCerrar }: { inicial: Item; alGuard
         </div>}
         <div className="grid-4">
           <label className="field" style={{ gridColumn: "span 3" }}><span>Qué se fabrica *</span><input className="input" value={x.nombre} placeholder="Placard a medida" onChange={(e) => poner({ nombre: e.target.value })} /></label>
-          <label className="field"><span>Código</span><input className="input" value={x.codigo} placeholder="CO-8C" onChange={(e) => poner({ codigo: e.target.value })} /></label>
+          <label className="field"><span>Código *</span><input className="input" value={x.codigo} placeholder="CO-8C" onChange={(e) => poner({ codigo: e.target.value })} /></label>
         </div>
         <label className="field"><span>Descripción *</span><textarea className="textarea" rows={3} value={x.descripcion} placeholder="Cómoda 8 cajones, 140 × 90 × 40 cm, melamina blanca y roble Dakar" onChange={(e) => poner({ descripcion: e.target.value })} /></label>
         <div className="grid-3">

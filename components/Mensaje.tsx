@@ -23,14 +23,18 @@ const cm = (n: number | null) => (n ? `${n} cm` : null);
 export function valoresModelo(p: Producto, categorias: Categoria[]): Valores {
   const tipo = categorias.find((c) => c.id === p.categoria_id); // categoria_id es el tipo; su padre, el ambiente
   const ambiente = tipo && categorias.find((c) => c.id === tipo.padre_id);
+  const precioLocal = p.precio_local ? ars(p.precio_local) : null;
+  const precioWeb = precioTexto(p.precio_web); // "$ X" (fijo), "Desde $ X", "$ X a $ Y" o null
+  // {precio}: para las cuotas de la financiación conviene un monto fijo. Se usa el del local si hay (el que se cobra en el
+  // showroom); si no, el de la web (fijo calcula cuotas; "desde"/"rango" se muestra pero no calcula); si no hay ninguno, va vacío.
   return {
     nombre: p.nombre,
     medidas: [medidas(p), p.detalle_medidas].filter(Boolean).join(" · "), // "80 × 160 × 40 cm · maquillador 100"
     ancho: cm(p.ancho_cm),
     alto: cm(p.alto_cm),
     profundidad: cm(p.profundidad_cm),
-    precio: precioTexto(p.precio_web),
-    precio_local: p.precio_local && ars(p.precio_local),
+    precio: precioLocal ?? precioWeb,
+    precio_local: precioLocal,
     codigo: p.codigo,
     tipo: p.tipo,
     descripcion: p.descripcion_corta,

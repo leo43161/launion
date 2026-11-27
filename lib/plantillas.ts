@@ -20,7 +20,7 @@ export const VARIABLES = [
   { clave: "ancho", texto: "El ancho (el frente)", ejemplo: "110 cm", en: MUEBLE },
   { clave: "alto", texto: "El alto", ejemplo: "80 cm", en: MUEBLE },
   { clave: "profundidad", texto: "La profundidad", ejemplo: "40 cm", en: MUEBLE },
-  { clave: "precio", texto: "El precio: el de la web en el Catálogo, el final en Presupuestos", ejemplo: "$ 529.999", en: MUEBLE },
+  { clave: "precio", texto: "El precio: en el Catálogo el del local o, si no, el de la web; el final en Presupuestos", ejemplo: "$ 529.999", en: MUEBLE },
   { clave: "precio_local", texto: "El precio del local", ejemplo: "$ 499.999", en: ["modelo"] },
   { clave: "codigo", texto: "El código del modelo", ejemplo: "05-147-0115", en: MUEBLE },
   { clave: "tipo", texto: "El tipo de mueble", ejemplo: "Maquilladores", en: MUEBLE },
@@ -123,5 +123,9 @@ export function armarMensaje(texto: string, valores: Valores): string {
     salida.push(...(salida.length || blancos.length === desde ? blancos : []), ...armados.flatMap((a) => a.sale));
     blancos = [];
   }
-  return [...salida, ...blancos].join("\n");
+  const resultado = [...salida, ...blancos].join("\n");
+  // Si no quedó nada (p. ej. una plantilla toda de {precio} y el mueble no tiene ningún precio), se dejan los textos con las
+  // variables en blanco: queda listo para escribir los precios a mano y mandarlo, en vez de un mensaje vacío.
+  if (resultado.trim()) return resultado;
+  return texto.replace(VARIABLE, (todo, clave: string) => (CLAVES.has(clave.toLowerCase()) ? "" : todo));
 }

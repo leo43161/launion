@@ -216,6 +216,8 @@ function Editar() {
         <div className="row">
           <Link className="btn" href={volver}>{cambios ? "Cancelar" : "Volver"}</Link>
           {id && <>
+            <Link className="btn" href={`/admin/presupuestos/imprimir/?id=${id}`} target="_blank" rel="noopener" onClick={(e) => { if (cambios) { e.preventDefault(); avisar("Guardá los cambios antes de generar el PDF."); } }}><Icono n="print" /><span className="hide-s">PDF cliente</span></Link>
+            <Link className="btn" href={`/admin/presupuestos/imprimir/?id=${id}&tipo=taller`} target="_blank" rel="noopener" onClick={(e) => { if (cambios) { e.preventDefault(); avisar("Guardá los cambios antes de generar el PDF."); } }}><Icono n="print" /><span className="hide-s">PDF taller</span></Link>
             <Link className="btn" href={`/admin/presupuestos/editar/?copiar=${id}`} aria-disabled={cambios} onClick={(e) => { if (cambios) { e.preventDefault(); avisar("Guardá los cambios antes de duplicar."); } }}><Icono n="copy" />Duplicar</Link>
             <button className="btn btn-danger" type="button" onClick={() => setEliminar(true)}><Icono n="trash" /><span className="hide-s">Eliminar</span></button>
           </>}

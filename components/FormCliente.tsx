@@ -42,12 +42,14 @@ export const aClienteForm = (x: Cliente, comercio: ClienteForm["comercio"] = { n
   comercio: x.comercio ? { nombre_comercio: x.comercio.nombre_comercio ?? "", rubro: x.comercio.rubro ?? "", direccion: aDir(x.comercio.direccion) } : comercio,
 });
 
-/** Lo que falta o está mal en los datos personales, para avisar antes de seguir. La API vuelve a revisar todo. */
-export function faltanCliente(d: ClienteForm): string[] {
+/** Lo que falta o está mal en los datos personales, para avisar antes de seguir. La API vuelve a revisar todo.
+    estricto: campos obligatorios extra del formulario de ventas (no del CRM). */
+export function faltanCliente(d: ClienteForm, estricto = false): string[] {
   const e: string[] = [];
   if (!d.nombre.trim()) e.push("el nombre");
   if (!d.apellido.trim()) e.push("el apellido");
   if (!/^[0-9A-Za-z]{6,12}$/.test(d.dni.replace(/[\s.-]/g, ""))) e.push("el DNI");
+  if (estricto && !d.fecha_nacimiento) e.push("la fecha de nacimiento");
   const tels = d.telefonos.filter((t) => t.numero.trim());
   if (!tels.length || tels.some((t) => !/^549\d{10}$/.test(normTelefono(t.numero)))) e.push("los teléfonos (con código de área, sin 0 ni 15)");
   if (d.email.trim() && !/^\S+@\S+\.\S+$/.test(d.email.trim())) e.push("el email");
@@ -56,13 +58,20 @@ export function faltanCliente(d: ClienteForm): string[] {
   return e;
 }
 
-/** Lo que falta en los datos comerciales (solo si compra para un negocio). */
-export function faltanComercio(d: ClienteForm): string[] {
+/** Lo que falta en los datos comerciales (solo si compra para un negocio).
+    estricto (ventas): el domicilio comercial y el barrio son obligatorios. */
+export function faltanComercio(d: ClienteForm, estricto = false): string[] {
   const e: string[] = [];
   if (!d.comercio.nombre_comercio.trim()) e.push("el nombre del comercio");
   if (!d.comercio.rubro.trim()) e.push("el rubro");
   const x = d.comercio.direccion;
-  if ((x.numero.trim() || x.barrio.trim() || x.localidad_id) && (!x.calle.trim() || !x.localidad_id)) e.push("la calle y la localidad del domicilio comercial (o dejalo vacío)");
+  if (estricto) {
+    if (!x.calle.trim()) e.push("la calle del domicilio comercial");
+    if (!x.barrio.trim()) e.push("el barrio del comercio");
+    if (!x.localidad_id) e.push("la localidad del comercio");
+  } else if ((x.numero.trim() || x.barrio.trim() || x.localidad_id) && (!x.calle.trim() || !x.localidad_id)) {
+    e.push("la calle y la localidad del domicilio comercial (o dejalo vacío)");
+  }
   return e;
 }
 
@@ -73,10 +82,11 @@ export const clientePedido = (d: ClienteForm, id: number | null): VentaGuardar["
   comercio: d.tipo === "negocio" ? { ...d.comercio, direccion: dirPedido(d.comercio.direccion) } : null,
 });
 
-interface Props { d: ClienteForm; op: OpcionesVenta; cambiar: (c: Partial<ClienteForm>) => void }
+interface Props { d: ClienteForm; op: OpcionesVenta; cambiar: (c: Partial<ClienteForm>) => void; estricto?: boolean }
 
-/** Nombre, DNI, teléfonos, dirección, margen de crédito y si compra para la casa o para un negocio. */
-export function CamposCliente({ d, op, cambiar }: Props) {
+/** Nombre, DNI, teléfonos, dirección, margen de crédito y si compra para la casa o para un negocio.
+    estricto (ventas): marca como obligatorios la fecha de nacimiento y, en el comercio, el domicilio y el barrio. */
+export function CamposCliente({ d, op, cambiar, estricto = false }: Props) {
   const campo = (k: "nombre" | "apellido" | "dni" | "email" | "fecha_nacimiento") => ({ value: d[k], onChange: (e: ChangeEvent<HTMLInputElement>) => cambiar({ [k]: e.target.value }) });
   const tel = (n: number, c: Partial<Tel>) => cambiar({ telefonos: d.telefonos.map((t, j) => (j === n ? { ...t, ...c } : t)) });
   const area = op.localidades.find((l) => String(l.id) === d.direccion.localidad_id)?.codigo_area ?? "381";
@@ -90,7 +100,7 @@ export function CamposCliente({ d, op, cambiar }: Props) {
           <select className="select" value={d.estado_civil} onChange={(e) => cambiar({ estado_civil: e.target.value as EstadoCivil | "" })}>
             <option value="">—</option>{Object.entries(ESTADO_CIVIL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></label>
-        <label className="field"><span>Fecha de nacimiento (opcional)</span><input className="input" type="date" max={hoyISO()} {...campo("fecha_nacimiento")} /></label>
+        <label className="field"><span>Fecha de nacimiento{estricto ? " *" : " (opcional)"}</span><input className="input" type="date" max={hoyISO()} {...campo("fecha_nacimiento")} /></label>
         <label className="field"><span>Email (opcional)</span><input className="input" type="email" autoComplete="off" placeholder="Para mandarle las novedades del pedido" {...campo("email")} /></label>
       </div>
 
@@ -107,7 +117,7 @@ export function CamposCliente({ d, op, cambiar }: Props) {
         </div>
       </fieldset>
 
-      <CamposDireccion titulo="Dirección" d={d.direccion} op={op} piso obligatoria cambiar={(x) => cambiar({ direccion: x })} />
+      <CamposDireccion titulo="Dirección" d={d.direccion} op={op} piso obligatorias={["calle", "localidad_id"]} cambiar={(x) => cambiar({ direccion: x })} />
 
       <div className="grid-2" style={{ alignItems: "end" }}>
         <label className="field"><span>Margen de crédito (opcional)</span>
@@ -123,8 +133,8 @@ export function CamposCliente({ d, op, cambiar }: Props) {
   );
 }
 
-/** Nombre del comercio, rubro y domicilio comercial (opcional). */
-export function CamposComercio({ d, op, cambiar }: Props) {
+/** Nombre del comercio, rubro y domicilio comercial. */
+export function CamposComercio({ d, op, cambiar, estricto = false }: Props) {
   const m = d.comercio;
   const poner = (c: Partial<ClienteForm["comercio"]>) => cambiar({ comercio: { ...m, ...c } });
   return (
@@ -134,28 +144,29 @@ export function CamposComercio({ d, op, cambiar }: Props) {
         <label className="field"><span>Rubro *</span><input className="input" list="rubros" placeholder="Kiosco" value={m.rubro} onChange={(e) => poner({ rubro: e.target.value })} />
           <datalist id="rubros">{op.rubros.map((r) => <option key={r} value={r} />)}</datalist></label>
       </div>
-      <CamposDireccion titulo="Domicilio comercial (opcional, si es distinto del de la casa)" d={m.direccion} op={op} cambiar={(x) => poner({ direccion: x })} />
+      <CamposDireccion titulo={estricto ? "Domicilio comercial" : "Domicilio comercial (opcional, si es distinto del de la casa)"} d={m.direccion} op={op}
+        obligatorias={estricto ? ["calle", "barrio", "localidad_id"] : []} cambiar={(x) => poner({ direccion: x })} />
     </>
   );
 }
 
-function CamposDireccion({ titulo, d, op, piso = false, obligatoria = false, cambiar }: { titulo: string; d: Dir; op: OpcionesVenta; piso?: boolean; obligatoria?: boolean; cambiar: (d: Dir) => void }) {
+function CamposDireccion({ titulo, d, op, piso = false, obligatorias = [], cambiar }: { titulo: string; d: Dir; op: OpcionesVenta; piso?: boolean; obligatorias?: (keyof Dir)[]; cambiar: (d: Dir) => void }) {
   const campo = (k: keyof Dir) => ({ value: d[k], onChange: (e: { target: { value: string } }) => cambiar({ ...d, [k]: e.target.value }) });
-  const req = obligatoria ? " *" : "";
+  const req = (k: keyof Dir) => (obligatorias.includes(k) ? " *" : "");
   const loc = op.localidades.find((l) => String(l.id) === d.localidad_id);
   const provincias = [...new Set(op.localidades.map((l) => l.provincia))];
   return (
     <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
       <legend className="label" style={{ marginBottom: 6 }}>{titulo}</legend>
       <div className="grid-4">
-        <label className="field" style={{ gridColumn: "span 2" }}><span>Calle{req}</span><input className="input" autoComplete="off" {...campo("calle")} /></label>
+        <label className="field" style={{ gridColumn: "span 2" }}><span>Calle{req("calle")}</span><input className="input" autoComplete="off" {...campo("calle")} /></label>
         <label className="field"><span>Número</span><input className="input" autoComplete="off" {...campo("numero")} /></label>
         {piso ? <>
           <label className="field"><span>Piso y depto.</span>
             <span className="row" style={{ flexWrap: "nowrap", gap: 6 }}><input className="input" aria-label="Piso" placeholder="Piso" {...campo("piso")} /><input className="input" aria-label="Departamento" placeholder="Depto." {...campo("departamento")} /></span></label>
         </> : <span />}
-        <label className="field" style={{ gridColumn: "span 2" }}><span>Barrio</span><input className="input" autoComplete="off" {...campo("barrio")} /></label>
-        <label className="field" style={{ gridColumn: "span 2" }}><span>Localidad{req}</span>
+        <label className="field" style={{ gridColumn: "span 2" }}><span>Barrio{req("barrio")}</span><input className="input" autoComplete="off" {...campo("barrio")} /></label>
+        <label className="field" style={{ gridColumn: "span 2" }}><span>Localidad{req("localidad_id")}</span>
           <select className="select" {...campo("localidad_id")}>
             <option value="">Elegí la localidad</option>
             {provincias.map((p) => <optgroup key={p} label={p}>{op.localidades.filter((l) => l.provincia === p).map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}</optgroup>)}
